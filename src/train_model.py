@@ -1,8 +1,3 @@
-# train_model.py
-# Entraînement Random Forest — charge les fichiers NON scalés de preprocessing.py
-# Le scaling est fait ICI, après suppression des leakage cols
-# → scaler.pkl correspond exactement aux 57 features finales du modèle
-
 import os
 import joblib
 import optuna
@@ -22,7 +17,6 @@ from sklearn.metrics import (
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 optuna.logging.set_verbosity(optuna.logging.WARNING)
 
-# Doit être identique à predict.py
 LEAKAGE_COLS = [
     'Recency', 'MonetaryPerDay', 'TenureRatio',
     'ChurnRiskCategory', 'LoyaltyLevel', 'SpendingCategory',
@@ -37,9 +31,6 @@ LEAKAGE_COLS = [
 
 def main():
 
-    # ─────────────────────────────────────────────
-    # 1. CHARGEMENT (fichiers NON scalés)
-    # ─────────────────────────────────────────────
     print_section("1. Chargement des fichiers train/test")
 
     tt_dir  = os.path.join(BASE_DIR, "data", "train_test")
@@ -53,9 +44,6 @@ def main():
     print(f"   Churn train : {y_train.mean():.2%} positifs")
     print(f"   Churn test  : {y_test.mean():.2%} positifs")
 
-    # ─────────────────────────────────────────────
-    # 2. SUPPRESSION DATA LEAKAGE
-    # ─────────────────────────────────────────────
     print_section("2. Suppression des colonnes data leakage")
 
     cols_dropped = [c for c in LEAKAGE_COLS if c in X_train.columns]
@@ -67,11 +55,7 @@ def main():
     X_test  = X_test.drop(columns=cols_dropped,  errors='ignore')
     print(f"\n   Features restantes : {X_train.shape[1]}")
 
-    # ─────────────────────────────────────────────
-    # 3. NORMALISATION — après suppression leakage
-    #    scaler fitté sur exactement les bonnes features
-    #    → cohérent avec predict.py
-    # ─────────────────────────────────────────────
+   
     print_section("3. Normalisation (StandardScaler)")
 
     scaler = StandardScaler()
@@ -89,9 +73,6 @@ def main():
     print(f"   Scaler sauvegardé → {scaler_path}")
     print(f"   (fitté sur {X_train_s.shape[1]} features)")
 
-    # ─────────────────────────────────────────────
-    # 4. OPTIMISATION OPTUNA
-    # ─────────────────────────────────────────────
     print_section("4. Optuna – Recherche des meilleurs hyperparamètres")
 
     def objective(trial):
@@ -114,20 +95,14 @@ def main():
     print(f"\n   Meilleurs paramètres : {study.best_params}")
     print(f"   Meilleur F1 (CV-3)   : {study.best_value:.4f}")
 
-    # ─────────────────────────────────────────────
-    # 5. ENTRAÎNEMENT DU MODÈLE FINAL
-    # ─────────────────────────────────────────────
     print_section("5. Entraînement du modèle final")
 
     best_params = {**study.best_params, 'class_weight': 'balanced',
                    'random_state': 42, 'n_jobs': -1}
     best_model = RandomForestClassifier(**best_params)
     best_model.fit(X_train_s, y_train)
-    print("   Modèle entraîné ✅")
+    print("   Modèle entraîné ")
 
-    # ─────────────────────────────────────────────
-    # 6. ÉVALUATION SUR X_TEST
-    # ─────────────────────────────────────────────
     print_section("6. Évaluation finale sur X_test")
 
     y_pred  = best_model.predict(X_test_s)
@@ -143,18 +118,13 @@ def main():
     print(f"   FN={cm[1,0]}  TP={cm[1,1]}")
     print(f"\n{classification_report(y_test, y_pred, target_names=['Fidèle (0)','Churn (1)'])}")
 
-    # ─────────────────────────────────────────────
-    # 7. VALIDATION CROISÉE (5 folds)
-    # ─────────────────────────────────────────────
     print_section("7. Validation croisée finale (5 folds)")
 
     cv_scores = cross_val_score(best_model, X_train_s, y_train, cv=5, scoring='f1')
     print(f"   F1 par fold : {[round(float(s), 4) for s in cv_scores]}")
     print(f"   F1 moyen    : {cv_scores.mean():.4f} ± {cv_scores.std():.4f}")
 
-    # ─────────────────────────────────────────────
-    # 8. IMPORTANCE DES FEATURES (top 15)
-    # ─────────────────────────────────────────────
+ 
     print_section("8. Importance des features (top 15)")
 
     feat_imp = pd.Series(
@@ -164,9 +134,7 @@ def main():
     for feat, imp in feat_imp.head(15).items():
         print(f"   {feat:<35} {imp:.4f}  {'█' * int(imp * 200)}")
 
-    # ─────────────────────────────────────────────
-    # 9. SAUVEGARDE
-    # ─────────────────────────────────────────────
+    
     print_section("9. Sauvegarde des artefacts")
 
     models_dir    = os.path.join(BASE_DIR, "models")

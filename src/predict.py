@@ -1,8 +1,3 @@
-# predict.py
-# Prédiction du Churn pour un ou plusieurs clients
-# Le scaler chargé correspond exactement aux 57 features post-leakage
-# car il est sauvegardé APRÈS la suppression dans train_model.py
-
 import os
 import joblib
 import warnings
@@ -18,7 +13,6 @@ SCALER_PATH   = os.path.join(MODELS_DIR, "scaler.pkl")
 FEATURES_PATH = os.path.join(MODELS_DIR, "features.pkl")
 CM_PATH       = os.path.join(MODELS_DIR, "country_means.pkl")
 
-# Identique à train_model.py
 LEAKAGE_COLS = [
     'Recency', 'MonetaryPerDay', 'TenureRatio',
     'ChurnRiskCategory', 'LoyaltyLevel', 'SpendingCategory',
@@ -31,7 +25,6 @@ LEAKAGE_COLS = [
 ]
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 def load_artifacts() -> tuple:
     model         = joblib.load(MODEL_PATH)
     scaler        = joblib.load(SCALER_PATH)
@@ -41,7 +34,6 @@ def load_artifacts() -> tuple:
     return model, scaler, feature_names, country_means
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 def preprocess_input(
     df_raw: pd.DataFrame,
     country_means: dict,
@@ -53,18 +45,15 @@ def preprocess_input(
     """
     df = df_raw.copy()
 
-    # 1. Colonnes inutiles
     df = df.drop(columns=[c for c in
                            ['NewsletterSubscribed', 'LastLoginIP', 'CustomerID', 'Churn']
                            if c in df.columns])
 
-    # 2. Valeurs aberrantes → NaN
     if 'SatisfactionScore' in df.columns:
         df['SatisfactionScore'] = df['SatisfactionScore'].replace([-1, 99], np.nan)
     if 'SupportTicketsCount' in df.columns:
         df['SupportTicketsCount'] = df['SupportTicketsCount'].replace([-1, 999], np.nan)
 
-    # 3. Imputation (valeurs fixes issues des médianes du train)
     impute = {
         'Age': 46.0, 'AvgDaysBetweenPurchases': 14.0,
         'SatisfactionScore': 3.0, 'SupportTicketsCount': 2.0,
@@ -73,7 +62,6 @@ def preprocess_input(
         if col in df.columns:
             df[col] = df[col].fillna(val)
 
-    # 4. Parsing RegistrationDate
     if 'RegistrationDate' in df.columns:
         df['RegistrationDate'] = pd.to_datetime(
             df['RegistrationDate'], dayfirst=True, errors='coerce'
@@ -84,7 +72,6 @@ def preprocess_input(
         df['RegWeekday'] = df['RegistrationDate'].dt.weekday.fillna(0).astype(int)
         df = df.drop(columns=['RegistrationDate'])
 
-    # 5. Feature engineering
     if 'MonetaryTotal' in df.columns and 'Recency' in df.columns:
         df['MonetaryPerDay'] = df['MonetaryTotal'] / (df['Recency'] + 1)
     if 'MonetaryTotal' in df.columns and 'Frequency' in df.columns:
@@ -94,7 +81,6 @@ def preprocess_input(
     if 'UniqueProducts' in df.columns and 'Frequency' in df.columns:
         df['DiversityPerTrans'] = df['UniqueProducts'] / (df['Frequency'] + 1)
 
-    # 6. Encodage ordinal
     ordinal_mappings = {
         'AgeCategory'      : ['18-24','25-34','35-44','45-54','55-64','65+','Inconnu'],
         'SpendingCategory' : ['Low','Medium','High','VIP'],
@@ -108,40 +94,28 @@ def preprocess_input(
             mapping = {v: i for i, v in enumerate(order)}
             df[col] = df[col].map(mapping).fillna(-1).astype(int)
 
-    # 7. Target encoding Country
     if 'Country' in df.columns:
         df['Country_encoded'] = df['Country'].map(country_means).fillna(0.33)
         df = df.drop(columns=['Country'])
 
-    # 8. One-Hot
     onehot_cols = [c for c in ['RFMSegment','CustomerType','FavoriteSeason',
                                 'Region','WeekendPreference','ProductDiversity',
                                 'Gender','AccountStatus'] if c in df.columns]
     df = pd.get_dummies(df, columns=onehot_cols, drop_first=True)
 
-    # 9. Suppression leakage (même liste que train_model.py)
     df = df.drop(columns=[c for c in LEAKAGE_COLS if c in df.columns])
 
-    # 10. Alignement sur les features du modèle
     df = df.reindex(columns=feature_names, fill_value=0)
 
     return df
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 def predict(df_raw: pd.DataFrame) -> pd.DataFrame:
-    """
-    Prédit le churn pour un DataFrame de clients bruts.
-
-    Returns
-    -------
-    DataFrame avec : CustomerID, churn_pred, churn_proba, risk_level
-    """
+ 
     model, scaler, feature_names, country_means = load_artifacts()
 
     X = preprocess_input(df_raw, country_means, feature_names)
 
-    # Normalisation avec le scaler fitté sur les 57 bonnes features
     X_scaled = pd.DataFrame(scaler.transform(X), columns=feature_names)
 
     preds  = model.predict(X_scaled)
@@ -164,7 +138,6 @@ def predict(df_raw: pd.DataFrame) -> pd.DataFrame:
     return results
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
 
     raw_path = os.path.join(BASE_DIR, "data", "raw", "data.csv")

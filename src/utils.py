@@ -1,6 +1,3 @@
-# utils.py
-# Fonctions utilitaires partagées entre preprocessing.py, train_model.py et predict.py
-
 import os
 import numpy as np
 import pandas as pd
@@ -13,12 +10,7 @@ from sklearn.metrics import (
 )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# AFFICHAGE
-# ─────────────────────────────────────────────────────────────────────────────
-
 def print_section(title: str, width: int = 40) -> None:
-    """Affiche un titre de section formaté dans le terminal."""
     print(f"\n{'=' * width}")
     print(f"{title}")
     print(f"{'=' * width}")
@@ -35,15 +27,8 @@ def print_df_info(df: pd.DataFrame, label: str = "DataFrame") -> None:
         print(f"    {str(dtype):<12} → {count} colonnes")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# ANALYSE QUALITÉ DES DONNÉES
-# ─────────────────────────────────────────────────────────────────────────────
-
 def missing_report(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Retourne un DataFrame trié par taux de valeurs manquantes décroissant.
-    Colonnes : count, percent.
-    """
+    
     missing = df.isnull().sum()
     missing = missing[missing > 0]
     report = pd.DataFrame({
@@ -55,19 +40,7 @@ def missing_report(df: pd.DataFrame) -> pd.DataFrame:
 
 def outlier_report(df: pd.DataFrame, cols: list | None = None,
                    z_thresh: float = 3.0) -> pd.DataFrame:
-    """
-    Détecte les outliers via le Z-score sur les colonnes numériques.
-
-    Parameters
-    ----------
-    df       : DataFrame source
-    cols     : liste de colonnes à analyser (None = toutes les numériques)
-    z_thresh : seuil Z-score (défaut 3.0)
-
-    Returns
-    -------
-    DataFrame avec count et percent d'outliers par colonne
-    """
+    
     if cols is None:
         cols = df.select_dtypes(include=np.number).columns.tolist()
 
@@ -89,17 +62,7 @@ def outlier_report(df: pd.DataFrame, cols: list | None = None,
 
 def correlation_matrix(df: pd.DataFrame, target: str = 'Churn',
                        threshold: float = 0.8) -> list:
-    """
-    Affiche la heatmap de corrélation et retourne les paires fortement corrélées.
-
-    Parameters
-    ----------
-    threshold : corrélation absolue au-delà de laquelle on signale la paire
-
-    Returns
-    -------
-    Liste de tuples (feat1, feat2, corr) pour |corr| > threshold
-    """
+    
     num_df = df.select_dtypes(include=np.number)
     corr   = num_df.corr()
 
@@ -111,7 +74,6 @@ def correlation_matrix(df: pd.DataFrame, target: str = 'Churn',
     plt.tight_layout()
     plt.show()
 
-    # Paires à forte corrélation (hors diagonale)
     high_corr = []
     for i in range(len(corr.columns)):
         for j in range(i + 1, len(corr.columns)):
@@ -127,14 +89,10 @@ def correlation_matrix(df: pd.DataFrame, target: str = 'Churn',
     return high_corr
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# VISUALISATIONS MODÈLE
-# ─────────────────────────────────────────────────────────────────────────────
 
 def plot_confusion_matrix(y_true, y_pred,
                           labels: list | None = None,
                           save_path: str | None = None) -> None:
-    """Affiche la matrice de confusion avec annotations."""
     if labels is None:
         labels = ['Fidèle (0)', 'Churn (1)']
 
@@ -155,7 +113,6 @@ def plot_confusion_matrix(y_true, y_pred,
 
 def plot_roc_curve(y_true, y_proba,
                    save_path: str | None = None) -> float:
-    """Trace la courbe ROC et retourne l'AUC."""
     fpr, tpr, _ = roc_curve(y_true, y_proba)
     roc_auc     = auc(fpr, tpr)
 
@@ -180,7 +137,6 @@ def plot_roc_curve(y_true, y_proba,
 
 def plot_precision_recall(y_true, y_proba,
                           save_path: str | None = None) -> None:
-    """Trace la courbe Précision-Rappel."""
     precision, recall, _ = precision_recall_curve(y_true, y_proba)
 
     plt.figure(figsize=(7, 5))
@@ -199,9 +155,7 @@ def plot_precision_recall(y_true, y_proba,
 
 def plot_feature_importance(model, feature_names: list, top_n: int = 20,
                              save_path: str | None = None) -> pd.Series:
-    """
-    Trace le bar chart des importances de features et retourne la Series triée.
-    """
+   
     importances = pd.Series(model.feature_importances_, index=feature_names)
     importances = importances.sort_values(ascending=True).tail(top_n)
 
@@ -223,14 +177,12 @@ def plot_feature_importance(model, feature_names: list, top_n: int = 20,
 
 def plot_churn_distribution(y: pd.Series,
                              save_path: str | None = None) -> None:
-    """Pie chart + bar chart de la distribution Churn / Fidèle."""
     counts = y.value_counts()
     labels = ['Fidèle (0)', 'Churn (1)']
     colors = ['#4575b4', '#d73027']
 
     fig, axes = plt.subplots(1, 2, figsize=(10, 4))
 
-    # Bar chart
     axes[0].bar(labels, counts.values, color=colors, edgecolor='white', width=0.5)
     for i, v in enumerate(counts.values):
         axes[0].text(i, v + 20, str(v), ha='center', fontweight='bold')
@@ -238,7 +190,6 @@ def plot_churn_distribution(y: pd.Series,
     axes[0].set_ylabel('Nombre de clients')
     axes[0].grid(axis='y', alpha=0.3)
 
-    # Pie chart
     axes[1].pie(counts.values, labels=labels, colors=colors,
                 autopct='%1.1f%%', startangle=90,
                 wedgeprops={'edgecolor': 'white', 'linewidth': 2})
@@ -253,9 +204,6 @@ def plot_churn_distribution(y: pd.Series,
     plt.show()
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# UTILITAIRES DIVERS
-# ─────────────────────────────────────────────────────────────────────────────
 
 def ensure_dirs(*paths: str) -> None:
     """Crée les répertoires s'ils n'existent pas."""

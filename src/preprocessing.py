@@ -1,8 +1,3 @@
-# preprocessing.py
-# Nettoyage → feature engineering → encodage → sauvegarde train/test (RAW, non scalés)
-# Le scaling est fait dans train_model.py APRÈS suppression des leakage cols
-# → le scaler sauvegardé correspond exactement aux 57 features du modèle
-
 import os
 import joblib
 import pandas as pd
@@ -10,22 +5,18 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 def load_data(path: str) -> pd.DataFrame:
     df = pd.read_csv(path)
     print(f"[load]  {df.shape[0]} lignes, {df.shape[1]} colonnes")
     return df
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 def clean_data(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
 
-    # Colonnes inutiles
     df = df.drop(columns=[c for c in ['NewsletterSubscribed', 'LastLoginIP', 'CustomerID']
                            if c in df.columns])
 
-    # Valeurs aberrantes → NaN
     df['SatisfactionScore']   = df['SatisfactionScore'].replace([-1, 99], np.nan)
     df['SupportTicketsCount'] = df['SupportTicketsCount'].replace([-1, 999], np.nan)
 
@@ -33,7 +24,6 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
     if neg:
         print(f"[clean] MonetaryTotal négatif : {neg} cas (conservés)")
 
-    # Imputation
     df['Age']                     = df['Age'].fillna(df['Age'].median())
     df['AvgDaysBetweenPurchases'] = df['AvgDaysBetweenPurchases'].fillna(
                                         df['AvgDaysBetweenPurchases'].median())
@@ -42,7 +32,6 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
     df['SupportTicketsCount']     = df['SupportTicketsCount'].fillna(
                                         df['SupportTicketsCount'].median())
 
-    # Parsing RegistrationDate
     df['RegistrationDate'] = pd.to_datetime(
         df['RegistrationDate'], dayfirst=True, errors='coerce'
     )
@@ -56,7 +45,6 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 def feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df['MonetaryPerDay']   = df['MonetaryTotal'] / (df['Recency'] + 1)
@@ -67,12 +55,10 @@ def feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 def encode_data(df: pd.DataFrame, target_col: str = 'Churn',
                 country_means: dict | None = None) -> tuple[pd.DataFrame, dict]:
     df = df.copy()
 
-    # Encodage ordinal
     ordinal_mappings = {
         'AgeCategory'      : ['18-24','25-34','35-44','45-54','55-64','65+','Inconnu'],
         'SpendingCategory' : ['Low','Medium','High','VIP'],
@@ -86,7 +72,6 @@ def encode_data(df: pd.DataFrame, target_col: str = 'Churn',
             mapping = {v: i for i, v in enumerate(order)}
             df[col] = df[col].map(mapping).fillna(-1).astype(int)
 
-    # Target encoding Country (anti data leakage : fits sur train only)
     if 'Country' in df.columns:
         if country_means is None:
             if target_col not in df.columns:
@@ -96,7 +81,6 @@ def encode_data(df: pd.DataFrame, target_col: str = 'Churn',
         df['Country_encoded'] = df['Country'].map(country_means).fillna(global_mean)
         df = df.drop(columns=['Country'])
 
-    # One-Hot
     onehot_cols = [c for c in ['RFMSegment','CustomerType','FavoriteSeason',
                                 'Region','WeekendPreference','ProductDiversity',
                                 'Gender','AccountStatus'] if c in df.columns]
@@ -106,9 +90,7 @@ def encode_data(df: pd.DataFrame, target_col: str = 'Churn',
     return df, country_means
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# PIPELINE PRINCIPALE
-# ─────────────────────────────────────────────────────────────────────────────
+
 if __name__ == "__main__":
 
     BASE_DIR   = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -117,19 +99,16 @@ if __name__ == "__main__":
     proc_dir   = os.path.join(BASE_DIR, "data", "processed")
     models_dir = os.path.join(BASE_DIR, "models")
 
-    # 1-3. Chargement, nettoyage, feature engineering
     df = load_data(raw_path)
     df = clean_data(df)
     df = feature_engineering(df)
 
-    # 4. Split AVANT encodage
     y = df['Churn']
     X = df.drop(columns=['Churn'])
     X_train_raw, X_test_raw, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42, stratify=y
     )
 
-    # 5. Encodage (country_means calculé sur train only)
     train_df = X_train_raw.copy()
     train_df['Churn'] = y_train.values
     X_train_enc, country_means = encode_data(train_df, target_col='Churn')
@@ -140,10 +119,8 @@ if __name__ == "__main__":
     X_test_enc, _ = encode_data(test_df, target_col='Churn', country_means=country_means)
     X_test_enc = X_test_enc.drop(columns=['Churn'])
 
-    # Aligner colonnes
     X_test_enc = X_test_enc.reindex(columns=X_train_enc.columns, fill_value=0)
 
-    # 6. Sauvegarde (NON scalés — le scaling est fait dans train_model.py)
     X_train_enc.to_csv(os.path.join(tt_dir, "X_train.csv"), index=False)
     X_test_enc.to_csv(os.path.join(tt_dir,  "X_test.csv"),  index=False)
     y_train.to_csv(os.path.join(tt_dir, "y_train.csv"), index=False)
@@ -153,7 +130,6 @@ if __name__ == "__main__":
     cleaned['Churn'] = y_train.values
     cleaned.to_csv(os.path.join(proc_dir, "cleaned_data.csv"), index=False)
 
-    # Sauvegarde country_means pour Flask
     joblib.dump(country_means, os.path.join(models_dir, "country_means.pkl"))
     print(f"[save]  country_means → {models_dir}/country_means.pkl")
 
