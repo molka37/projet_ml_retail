@@ -1,18 +1,15 @@
 # Projet Machine Learning – Prédiction du Churn
 
 
-
 Analyser le comportement des clients d’un site e-commerce et prédire le churn (départ client) à l’aide du Machine Learning.
 
 Le projet suit une chaîne complète de traitement :
 
 > **Exploration → Prétraitement → Modélisation → Évaluation → Déploiement (Flask)**
 
----
 
 ## 📁 Structure du projet
 
-```
 projet_ml_retail/
 │
 ├── data/
@@ -76,7 +73,7 @@ pip install -r requirements.txt
 
 ---
 
-## 🔍 Étapes du projet
+##  Étapes du projet
 
 ### 1. Exploration des données
 
@@ -144,7 +141,7 @@ http://127.0.0.1:5000
 
 ---
 
-## 🤖 Modèles utilisés
+##  Modèles utilisés
 
 * **Classification** : RandomForestClassifier (prédiction du churn)
 * **Clustering** : KMeans (segmentation des clients)
@@ -152,7 +149,7 @@ http://127.0.0.1:5000
 
 ---
 
-## 📊 Évaluation
+## Évaluation
 
 Le modèle de classification est évalué avec :
 
@@ -182,9 +179,8 @@ Dans models/ :
 - reg_features.pkl → features de régression
 - `country_means.pkl`→ encodage pays
 - `impute_values.pkl`→ valeurs d'imputation
-Écrire à Fatma Chrif
 
-## 🌐 Interface Web
+##  Interface Web
 
 L’application Flask permet :
 
@@ -199,7 +195,7 @@ L’application Flask permet :
 
 ---
 
-## ✅ Conclusion
+##  Conclusion
 
 Ce projet implémente une chaîne complète de Machine Learning :
 
@@ -213,6 +209,6 @@ Ce projet implémente une chaîne complète de Machine Learning :
 
 ---
 
-## 👩‍💻 Auteur
+##  Auteur
 
 Projet réalisé dans le cadre du module Machine Learning – GI2

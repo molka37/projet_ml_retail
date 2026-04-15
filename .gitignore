@@ -1,32 +1,47 @@
-# Environnement virtuel
+# ── Environnement virtuel ──────────────────────────────────
 venv/
-ENV/
-env/
+.env
+.venv/
 
-# Fichiers Python compilés
+# ── Python ─────────────────────────────────────────────────
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 *.pyd
+.Python
+*.egg-info/
+dist/
+build/
 
-# Jupyter
-.ipynb_checkpoints
+# ── Jupyter ────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb_checkpoints
 
-# Logs et temporaires
-*.log
-*.tmp
+# ── Données brutes (trop lourdes pour GitHub) ──────────────
+data/raw/*.csv
+data/processed/*.csv
+data/train_test/*.csv
 
-# Système
-.DS_Store
-Thumbs.db
-
+# ── Modèles sauvegardés (trop lourds pour GitHub) ──────────
 models/*.pkl
 models/*.joblib
 
-data/raw/
+# ── Reports / visualisations générées ──────────────────────
+reports/*.png
+reports/*.jpg
+reports/*.pdf
 
-data/processed/
-data/train_test/
-
-# VS Code
+# ── IDE ────────────────────────────────────────────────────
 .vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# ── OS ─────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Logs ───────────────────────────────────────────────────
+*.log
+logs/
