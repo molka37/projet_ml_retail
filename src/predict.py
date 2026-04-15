@@ -4,155 +4,202 @@ import warnings
 import numpy as np
 import pandas as pd
 
+from preprocessing import transform_for_inference
+
 warnings.filterwarnings("ignore")
 
-BASE_DIR      = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MODELS_DIR    = os.path.join(BASE_DIR, "models")
-MODEL_PATH    = os.path.join(MODELS_DIR, "model.pkl")
-SCALER_PATH   = os.path.join(MODELS_DIR, "scaler.pkl")
-FEATURES_PATH = os.path.join(MODELS_DIR, "features.pkl")
-CM_PATH       = os.path.join(MODELS_DIR, "country_means.pkl")
+BASE_DIR   = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MODELS_DIR = os.path.join(BASE_DIR, "models")
 
-LEAKAGE_COLS = [
-    'Recency', 'MonetaryPerDay', 'TenureRatio',
-    'ChurnRiskCategory', 'LoyaltyLevel', 'SpendingCategory',
-    'AccountStatus_Closed', 'AccountStatus_Pending', 'AccountStatus_Suspended',
-    'CustomerType_Nouveau', 'CustomerType_Occasionnel',
-    'CustomerType_Perdu', 'CustomerType_Régulier',
-    'RFMSegment_Dormants', 'RFMSegment_Fidèles', 'RFMSegment_Potentiels',
-    'PreferredMonth', 'CustomerTenureDays', 'FirstPurchaseDaysAgo',
-    'UniqueDescriptions', 'UniqueInvoices',
-]
+MODEL_PATH         = os.path.join(MODELS_DIR, "model.pkl")
+SCALER_PATH        = os.path.join(MODELS_DIR, "scaler.pkl")
+FEATURES_PATH      = os.path.join(MODELS_DIR, "features.pkl")
+CM_PATH            = os.path.join(MODELS_DIR, "country_means.pkl")
+IMPUTE_PATH        = os.path.join(MODELS_DIR, "impute_values.pkl")
+KMEANS_PATH        = os.path.join(MODELS_DIR, "kmeans.pkl")
+PCA_CLUSTER_PATH   = os.path.join(MODELS_DIR, "pca_cluster.pkl")   # ← nouveau
+REG_MODEL_PATH     = os.path.join(MODELS_DIR, "reg_model.pkl")
+SCALER_REG_PATH    = os.path.join(MODELS_DIR, "scaler_reg.pkl")
+REG_FEATURES_PATH  = os.path.join(MODELS_DIR, "reg_features.pkl")
+
+# Variables globales — chargées une seule fois (lazy loading)
+_model         = None
+_scaler        = None
+_feature_names = None
+_country_means = None
+_impute_values = None
+_kmeans        = None
+_pca_cluster   = None
+_reg_model     = None
+_scaler_reg    = None
+_reg_features  = None
 
 
-def load_artifacts() -> tuple:
-    model         = joblib.load(MODEL_PATH)
-    scaler        = joblib.load(SCALER_PATH)
-    feature_names = joblib.load(FEATURES_PATH)
-    country_means = joblib.load(CM_PATH)
-    print(f"[load] Artefacts chargés — {len(feature_names)} features attendues")
-    return model, scaler, feature_names, country_means
+def load_artifacts():
+    """Charge tous les artefacts depuis models/ au premier appel."""
+    global _model, _scaler, _feature_names, _country_means, _impute_values
+    global _kmeans, _pca_cluster, _reg_model, _scaler_reg, _reg_features
 
+    if _model is not None:
+        return  # Déjà chargés
 
-def preprocess_input(
-    df_raw: pd.DataFrame,
-    country_means: dict,
-    feature_names: list
-) -> pd.DataFrame:
-    """
-    Reproduit exactement preprocessing.py + suppression leakage de train_model.py.
-    Retourne un DataFrame aligné sur feature_names, prêt pour scaler.transform().
-    """
-    df = df_raw.copy()
-
-    df = df.drop(columns=[c for c in
-                           ['NewsletterSubscribed', 'LastLoginIP', 'CustomerID', 'Churn']
-                           if c in df.columns])
-
-    if 'SatisfactionScore' in df.columns:
-        df['SatisfactionScore'] = df['SatisfactionScore'].replace([-1, 99], np.nan)
-    if 'SupportTicketsCount' in df.columns:
-        df['SupportTicketsCount'] = df['SupportTicketsCount'].replace([-1, 999], np.nan)
-
-    impute = {
-        'Age': 46.0, 'AvgDaysBetweenPurchases': 14.0,
-        'SatisfactionScore': 3.0, 'SupportTicketsCount': 2.0,
+    required = {
+        "model.pkl":         MODEL_PATH,
+        "scaler.pkl":        SCALER_PATH,
+        "features.pkl":      FEATURES_PATH,
+        "country_means.pkl": CM_PATH,
+        "impute_values.pkl": IMPUTE_PATH,
+        "kmeans.pkl":        KMEANS_PATH,
+        "pca_cluster.pkl":   PCA_CLUSTER_PATH,
+        "reg_model.pkl":     REG_MODEL_PATH,
+        "scaler_reg.pkl":    SCALER_REG_PATH,
+        "reg_features.pkl":  REG_FEATURES_PATH,
     }
-    for col, val in impute.items():
-        if col in df.columns:
-            df[col] = df[col].fillna(val)
 
-    if 'RegistrationDate' in df.columns:
-        df['RegistrationDate'] = pd.to_datetime(
-            df['RegistrationDate'], dayfirst=True, errors='coerce'
-        )
-        df['RegYear']    = df['RegistrationDate'].dt.year.fillna(2010).astype(int)
-        df['RegMonth']   = df['RegistrationDate'].dt.month.fillna(1).astype(int)
-        df['RegDay']     = df['RegistrationDate'].dt.day.fillna(1).astype(int)
-        df['RegWeekday'] = df['RegistrationDate'].dt.weekday.fillna(0).astype(int)
-        df = df.drop(columns=['RegistrationDate'])
+    for name, path in required.items():
+        if not os.path.exists(path):
+            raise FileNotFoundError(
+                f"Artefact manquant : {name}\n"
+                f"Lance d'abord : python src/preprocessing.py  puis  python src/train_model.py"
+            )
 
-    if 'MonetaryTotal' in df.columns and 'Recency' in df.columns:
-        df['MonetaryPerDay'] = df['MonetaryTotal'] / (df['Recency'] + 1)
-    if 'MonetaryTotal' in df.columns and 'Frequency' in df.columns:
-        df['AvgBasketValue'] = df['MonetaryTotal'] / (df['Frequency'] + 1)
-    if 'Recency' in df.columns and 'CustomerTenureDays' in df.columns:
-        df['TenureRatio'] = df['Recency'] / (df['CustomerTenureDays'] + 1)
-    if 'UniqueProducts' in df.columns and 'Frequency' in df.columns:
-        df['DiversityPerTrans'] = df['UniqueProducts'] / (df['Frequency'] + 1)
+    _model         = joblib.load(MODEL_PATH)
+    _scaler        = joblib.load(SCALER_PATH)
+    _feature_names = joblib.load(FEATURES_PATH)
+    _country_means = joblib.load(CM_PATH)
+    _impute_values = joblib.load(IMPUTE_PATH)
+    _kmeans        = joblib.load(KMEANS_PATH)
+    _pca_cluster   = joblib.load(PCA_CLUSTER_PATH)
+    _reg_model     = joblib.load(REG_MODEL_PATH)
+    _scaler_reg    = joblib.load(SCALER_REG_PATH)
+    _reg_features  = joblib.load(REG_FEATURES_PATH)
 
-    ordinal_mappings = {
-        'AgeCategory'      : ['18-24','25-34','35-44','45-54','55-64','65+','Inconnu'],
-        'SpendingCategory' : ['Low','Medium','High','VIP'],
-        'LoyaltyLevel'     : ['Nouveau','Jeune','Établi','Ancien','Inconnu'],
-        'ChurnRiskCategory': ['Faible','Moyen','Élevé','Critique'],
-        'BasketSizeCategory': ['Petit','Moyen','Grand','Inconnu'],
-        'PreferredTimeOfDay': ['Matin','Midi','Après-midi','Soir','Nuit'],
+    print(f"[load] Artefacts chargés — {len(_feature_names)} features clf | "
+          f"{len(_reg_features)} features reg | "
+          f"PCA {_pca_cluster.n_components_}D → KMeans")
+
+
+def risk_label(p: float) -> str:
+    """Probabilité → niveau de risque churn."""
+    if p < 0.20:
+        return "Faible"
+    elif p < 0.40:
+        return "Moyen"
+    elif p < 0.70:
+        return "Élevé"
+    else:
+        return "Critique"
+
+
+def cluster_label(c: int) -> str:
+    """Numéro de cluster → nom métier (k=3)."""
+    labels = {
+        0: "Clients fidèles",
+        1: "Clients à risque",
+        2: "Clients dormants",
     }
-    for col, order in ordinal_mappings.items():
-        if col in df.columns:
-            mapping = {v: i for i, v in enumerate(order)}
-            df[col] = df[col].map(mapping).fillna(-1).astype(int)
-
-    if 'Country' in df.columns:
-        df['Country_encoded'] = df['Country'].map(country_means).fillna(0.33)
-        df = df.drop(columns=['Country'])
-
-    onehot_cols = [c for c in ['RFMSegment','CustomerType','FavoriteSeason',
-                                'Region','WeekendPreference','ProductDiversity',
-                                'Gender','AccountStatus'] if c in df.columns]
-    df = pd.get_dummies(df, columns=onehot_cols, drop_first=True)
-
-    df = df.drop(columns=[c for c in LEAKAGE_COLS if c in df.columns])
-
-    df = df.reindex(columns=feature_names, fill_value=0)
-
-    return df
+    return labels.get(c, f"Cluster {c}")
 
 
 def predict(df_raw: pd.DataFrame) -> pd.DataFrame:
- 
-    model, scaler, feature_names, country_means = load_artifacts()
+    """
+    Retourne pour chaque client :
+      - churn_pred, churn_proba, risk_level   (Classification)
+      - cluster, cluster_label                (Clustering : PCA → KMeans)
+      - monetary_pred                         (Régression MonetaryTotal)
 
-    X = preprocess_input(df_raw, country_means, feature_names)
+    Paramètres
+    ----------
+    df_raw : DataFrame avec les colonnes brutes (formulaire ou CSV)
 
-    X_scaled = pd.DataFrame(scaler.transform(X), columns=feature_names)
+    Retourne
+    --------
+    DataFrame avec toutes les prédictions
+    """
+    load_artifacts()
 
-    preds  = model.predict(X_scaled)
-    probas = model.predict_proba(X_scaled)[:, 1]
+    # ── 1. CLASSIFICATION ─────────────────────────────────────────────
+    X_clf = transform_for_inference(df_raw, _country_means, _impute_values, _feature_names)
 
-    def risk_label(p):
-        if p < 0.25:   return 'Faible'
-        elif p < 0.50: return 'Moyen'
-        elif p < 0.75: return 'Élevé'
-        else:          return 'Critique'
+    missing = [c for c in _feature_names if c not in X_clf.columns]
+    if missing:
+        raise ValueError(f"Features manquantes pour la classification : {missing}")
 
-    results = df_raw[['CustomerID']].copy().reset_index(drop=True) \
-              if 'CustomerID' in df_raw.columns \
-              else pd.DataFrame(index=range(len(df_raw)))
+    X_clf_scaled = pd.DataFrame(
+        _scaler.transform(X_clf),
+        columns=_feature_names,
+        index=X_clf.index
+    )
 
-    results['churn_pred']  = preds
-    results['churn_proba'] = np.round(probas, 4)
-    results['risk_level']  = [risk_label(p) for p in probas]
+    preds  = _model.predict(X_clf_scaled)
+    probas = _model.predict_proba(X_clf_scaled)[:, 1]
+
+    # ── 2. CLUSTERING : PCA réduite → KMeans ──────────────────────────
+    # On applique la même PCA que celle entraînée dans train_model.py
+    # pour avoir des clusters équilibrés
+    X_pca    = _pca_cluster.transform(X_clf_scaled)
+    clusters = _kmeans.predict(X_pca)
+
+    # ── 3. RÉGRESSION ─────────────────────────────────────────────────
+    df_reg = df_raw.copy()
+
+    # Nettoyage valeurs aberrantes
+    if "SupportTicketsCount" in df_reg.columns:
+        df_reg["SupportTicketsCount"] = df_reg["SupportTicketsCount"].replace([-1, 999], np.nan)
+    if "SatisfactionScore" in df_reg.columns:
+        df_reg["SatisfactionScore"] = df_reg["SatisfactionScore"].replace([-1, 99], np.nan)
+
+    # Imputation — toutes les features regression avec medianes du train
+    # _impute_values contient maintenant toutes les features reg (Recency, Frequency, etc.)
+    for col in _reg_features:
+        if col in df_reg.columns:
+            mediane = _impute_values.get(col, df_reg[col].median() if df_reg[col].notna().any() else 0)
+            df_reg[col] = df_reg[col].fillna(mediane)
+        else:
+            # Colonne absente (formulaire web) : utiliser mediane du train
+            df_reg[col] = _impute_values.get(col, 0)
+
+    X_reg         = df_reg[_reg_features].copy()
+    X_reg_scaled  = _scaler_reg.transform(X_reg)
+    monetary_pred = _reg_model.predict(X_reg_scaled)
+
+    # ── 4. Assemblage des résultats ────────────────────────────────────
+    if "CustomerID" in df_raw.columns:
+        results = df_raw[["CustomerID"]].copy().reset_index(drop=True)
+    else:
+        results = pd.DataFrame(index=range(len(df_raw)))
+
+    results["churn_pred"]    = preds
+    results["churn_proba"]   = np.round(probas, 4)
+    results["risk_level"]    = [risk_label(p) for p in probas]
+    results["cluster"]       = clusters
+    results["cluster_label"] = [cluster_label(c) for c in clusters]
+    results["monetary_pred"] = np.round(monetary_pred, 2)
 
     return results
 
 
 if __name__ == "__main__":
-
     raw_path = os.path.join(BASE_DIR, "data", "raw", "data.csv")
 
-    print("=" * 50)
+    print("=" * 60)
     print("  PREDICT — Test sur 10 clients aléatoires")
-    print("=" * 50)
+    print("=" * 60)
 
-    df_raw  = pd.read_csv(raw_path)
-    sample  = df_raw.sample(10, random_state=99).reset_index(drop=True)
+    if not os.path.exists(raw_path):
+        print(f"Fichier introuvable : {raw_path}")
+        exit(1)
+
+    df_raw = pd.read_csv(raw_path)
+    sample = df_raw.sample(10, random_state=99).reset_index(drop=True)
+
     results = predict(sample)
 
     print("\nRésultats :")
     print(results.to_string(index=False))
 
-    print(f"\n  Clients prédits churners : {results['churn_pred'].sum()} / {len(results)}")
-    print(f"  Probabilité moyenne      : {results['churn_proba'].mean():.2%}")
-    print(f"  Distribution risque      : {results['risk_level'].value_counts().to_dict()}")
+    print(f"\n  Churners prédits    : {results['churn_pred'].sum()} / {len(results)}")
+    print(f"  Probabilité moyenne : {results['churn_proba'].mean():.2%}")
+    print(f"  Risque              : {results['risk_level'].value_counts().to_dict()}")
+    print(f"  Clusters            : {results['cluster_label'].value_counts().to_dict()}")
+    print(f"  Dépense prévue moy. : £{results['monetary_pred'].mean():.2f}")

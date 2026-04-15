@@ -1,21 +1,32 @@
-# Ignorer l'environnement virtuel
+# Environnement virtuel
 venv/
 ENV/
 env/
 
-# Ignorer les fichiers Python compilés
+# Fichiers Python compilés
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 
-# Ignorer Jupyter checkpoints
+# Jupyter
 .ipynb_checkpoints
 
-# Ignorer logs et fichiers temporaires
+# Logs et temporaires
 *.log
 *.tmp
 
-# Ignorer fichiers système
+# Système
 .DS_Store
 Thumbs.db
+
+models/*.pkl
+models/*.joblib
+
+data/raw/
+
+data/processed/
+data/train_test/
+
+# VS Code
+.vscode/

@@ -2,183 +2,158 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Prédiction du Churn</title>
+    <title>Prediction Churn - Retail ML</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: #f5f5f5;
-            padding: 40px;
-            margin: 0;
-        }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Arial, sans-serif; background: #f0f2f5; padding: 32px 16px; color: #222; }
 
         .card {
-            background: white;
-            padding: 25px;
-            border-radius: 12px;
-            max-width: 800px;
-            margin: auto;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            background: #fff; border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            max-width: 860px; margin: 0 auto 24px; padding: 28px 32px;
         }
+        h1 { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+        .subtitle { font-size: 13px; color: #666; margin-bottom: 24px; }
 
-        h2 {
-            margin-bottom: 25px;
-        }
-
-        .grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 14px 18px;
-        }
-
-        .field {
-            display: flex;
-            flex-direction: column;
-        }
-
-        label {
-            margin-bottom: 6px;
-            font-weight: bold;
-        }
-
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 20px; }
+        .field { display: flex; flex-direction: column; gap: 5px; }
+        label { font-size: 13px; font-weight: 600; color: #444; }
         input, select {
-            padding: 10px;
-            box-sizing: border-box;
-            border: 1px solid #999;
-            border-radius: 4px;
-            font-size: 16px;
+            padding: 9px 12px; border: 1px solid #ccc; border-radius: 6px;
+            font-size: 14px; width: 100%; transition: border-color .2s;
         }
+        input:focus, select:focus { outline: none; border-color: #007bff; }
 
+        .btn-row { display: flex; gap: 12px; margin-top: 20px; }
         button {
-            color: white;
-            padding: 12px;
-            border: none;
-            width: 100%;
-            margin-top: 16px;
-            cursor: pointer;
-            border-radius: 4px;
-            font-size: 16px;
+            flex: 1; padding: 11px; border: none; border-radius: 6px;
+            font-size: 15px; font-weight: 600; cursor: pointer;
+            transition: opacity .2s, transform .1s;
         }
+        button:active { transform: scale(0.98); }
+        button:hover  { opacity: .88; }
+        .btn-random  { background: #28a745; color: #fff; }
+        .btn-predict { background: #007bff; color: #fff; }
 
-        .btn-secondary {
-            background: #28a745;
+        .results-card {
+            background: #fff; border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            max-width: 860px; margin: 0 auto; padding: 28px 32px; display: none;
         }
+        .results-card.visible { display: block; }
+        .results-title { font-size: 16px; font-weight: 600; margin-bottom: 18px; color: #333; }
 
-        .btn-secondary:hover {
-            background: #218838;
-        }
+        .metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 20px; }
+        .metric-box { border-radius: 8px; padding: 16px; text-align: center; }
+        .metric-label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+        .metric-value { font-size: 24px; font-weight: 700; }
+        .metric-sub   { font-size: 12px; margin-top: 4px; }
 
-        .btn-primary {
-            background: #007bff;
-        }
+        .risk-faible   { background: #e8f5e9; }
+        .risk-faible   .metric-label { color: #2e7d32; }
+        .risk-faible   .metric-value { color: #1b5e20; }
+        .risk-moyen    { background: #fff8e1; }
+        .risk-moyen    .metric-label { color: #f57f17; }
+        .risk-moyen    .metric-value { color: #e65100; }
+        .risk-eleve    { background: #fff3e0; }
+        .risk-eleve    .metric-label { color: #e65100; }
+        .risk-eleve    .metric-value { color: #bf360c; }
+        .risk-critique { background: #fce4ec; }
+        .risk-critique .metric-label { color: #c62828; }
+        .risk-critique .metric-value { color: #b71c1c; }
 
-        .btn-primary:hover {
-            background: #0069d9;
-        }
+        .cluster-box { background: #e3f2fd; }
+        .cluster-box .metric-label { color: #1565c0; }
+        .cluster-box .metric-value { font-size: 16px; color: #0d47a1; }
+        .reg-box { background: #f3e5f5; }
+        .reg-box .metric-label { color: #6a1b9a; }
+        .reg-box .metric-value { color: #4a148c; }
 
-        .result {
-            margin-top: 20px;
-            padding: 14px;
-            background: #e9f7ef;
-            border-radius: 8px;
-            font-size: 18px;
-        }
+        .proba-section { margin-top: 4px; }
+        .proba-label { display: flex; justify-content: space-between; font-size: 13px; color: #555; margin-bottom: 6px; }
+        .proba-bar-bg { height: 10px; background: #e0e0e0; border-radius: 5px; overflow: hidden; }
+        .proba-bar-fill { height: 100%; border-radius: 5px; transition: width .5s ease; }
 
-        .error {
-            margin-top: 20px;
-            padding: 14px;
-            background: #fdeaea;
-            border-radius: 8px;
-            font-size: 18px;
-            color: #b00020;
+        .error-box {
+            background: #fdeaea; border-left: 4px solid #e53935;
+            border-radius: 6px; padding: 14px 16px; color: #b71c1c; font-size: 14px;
+            max-width: 860px; margin: 16px auto; display: none;
         }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h2>Prédiction du Churn</h2>
+    <h1>Prediction Churn Client</h1>
+    <p class="subtitle">Classification &middot; Clustering &middot; Regression &mdash; Retail E-commerce</p>
 
     <div class="grid">
         <div class="field">
             <label for="CustomerID">Customer ID</label>
-            <input id="CustomerID" value="15484">
+            <input id="CustomerID" type="number" value="15484">
         </div>
-
         <div class="field">
-            <label for="Gender">Gender</label>
+            <label for="Gender">Genre</label>
             <select id="Gender">
                 <option value="F">Femme</option>
                 <option value="M">Homme</option>
             </select>
         </div>
-
         <div class="field">
-            <label for="Recency">Recency</label>
-            <input id="Recency" value="12">
+            <label for="Recency">Recency (jours)</label>
+            <input id="Recency" type="number" value="12">
         </div>
-
         <div class="field">
-            <label for="Frequency">Frequency</label>
-            <input id="Frequency" value="5">
+            <label for="Frequency">Frequency (commandes)</label>
+            <input id="Frequency" type="number" value="5">
         </div>
-
         <div class="field">
-            <label for="MonetaryTotal">Monetary Total</label>
-            <input id="MonetaryTotal" value="450.5">
+            <label for="MonetaryTotal">Monetary Total (£)</label>
+            <input id="MonetaryTotal" type="number" step="any" value="450.5">
         </div>
-
         <div class="field">
-            <label for="MonetaryAvg">Monetary Avg</label>
-            <input id="MonetaryAvg" value="90">
+            <label for="MonetaryAvg">Monetary Avg (£)</label>
+            <input id="MonetaryAvg" type="number" step="any" value="90">
         </div>
-
         <div class="field">
             <label for="TotalQuantity">Total Quantity</label>
-            <input id="TotalQuantity" value="20">
+            <input id="TotalQuantity" type="number" value="20">
         </div>
-
         <div class="field">
             <label for="AvgDaysBetweenPurchases">Avg Days Between Purchases</label>
-            <input id="AvgDaysBetweenPurchases" value="18">
+            <input id="AvgDaysBetweenPurchases" type="number" step="any" value="18">
         </div>
-
         <div class="field">
             <label for="UniqueProducts">Unique Products</label>
-            <input id="UniqueProducts" value="10">
+            <input id="UniqueProducts" type="number" value="10">
         </div>
-
         <div class="field">
             <label for="TotalTransactions">Total Transactions</label>
-            <input id="TotalTransactions" value="7">
+            <input id="TotalTransactions" type="number" value="7">
         </div>
-
         <div class="field">
-            <label for="SupportTicketsCount">Support Tickets Count</label>
-            <input id="SupportTicketsCount" value="1">
+            <label for="SupportTicketsCount">Support Tickets</label>
+            <input id="SupportTicketsCount" type="number" value="1">
         </div>
-
         <div class="field">
-            <label for="SatisfactionScore">Satisfaction Score</label>
-            <input id="SatisfactionScore" value="4">
+            <label for="SatisfactionScore">Satisfaction Score (1-5)</label>
+            <input id="SatisfactionScore" type="number" step="any" value="4">
         </div>
-
         <div class="field">
             <label for="Age">Age</label>
-            <input id="Age" value="35">
+            <input id="Age" type="number" step="any" value="35">
         </div>
-
         <div class="field">
-            <label for="FavoriteSeason">Favorite Season</label>
+            <label for="FavoriteSeason">Saison preferee</label>
             <select id="FavoriteSeason">
                 <option value="Hiver">Hiver</option>
                 <option value="Printemps" selected>Printemps</option>
-                <option value="Été">Été</option>
+                <option value="Été">Ete</option>
                 <option value="Automne">Automne</option>
             </select>
         </div>
-
         <div class="field">
-            <label for="AccountStatus">Account Status</label>
+            <label for="AccountStatus">Statut du compte</label>
             <select id="AccountStatus">
                 <option value="Active" selected>Active</option>
                 <option value="Suspended">Suspended</option>
@@ -188,143 +163,267 @@
         </div>
     </div>
 
-    <button class="btn-secondary" onclick="loadRandomClient()">Charger un client aléatoire depuis la base</button>
-    <button class="btn-primary" onclick="predictChurn()">Prédire</button>
-
-    <div id="result" class="result"></div>
+    <div class="btn-row">
+        <button class="btn-random"  onclick="loadRandomClient()">Client aleatoire</button>
+        <button class="btn-predict" onclick="predictChurn()">Predire</button>
+    </div>
 </div>
 
+<div class="results-card" id="resultsCard">
+    <div class="results-title">Resultats de la prediction</div>
+    <div class="metrics-grid">
+        <div class="metric-box" id="churnBox">
+            <div class="metric-label" id="riskLabel">Risque Churn</div>
+            <div class="metric-value" id="churnPred">--</div>
+            <div class="metric-sub" id="churnSub"></div>
+        </div>
+        <div class="metric-box cluster-box">
+            <div class="metric-label">Segment client</div>
+            <div class="metric-value" id="clusterLabel">--</div>
+            <div class="metric-sub" id="clusterSub"></div>
+        </div>
+        <div class="metric-box reg-box">
+            <div class="metric-label">Depense prevue</div>
+            <div class="metric-value" id="monetaryPred">--</div>
+            <div class="metric-sub">MonetaryTotal estime</div>
+        </div>
+    </div>
+    <div class="proba-section">
+        <div class="proba-label">
+            <span>Probabilite de churn</span>
+            <span id="probaText">--</span>
+        </div>
+        <div class="proba-bar-bg">
+            <div class="proba-bar-fill" id="probaBar" style="width:0%; background:#e53935;"></div>
+        </div>
+    </div>
+</div>
+
+<div class="error-box" id="errorBox"></div>
+
 <script>
-function num(id, fallback = 0) {
-    const v = document.getElementById(id).value;
-    const n = Number(v);
-    return isNaN(n) ? fallback : n;
+function num(id) {
+    var v = document.getElementById(id).value.trim();
+    if (v === "") return null;
+    var n = Number(v);
+    return isNaN(n) ? null : n;
 }
 
-async function loadRandomClient() {
-    try {
-        const response = await fetch("/random_client");
-        const result = await response.json();
-
-        if (!result.success) {
-            document.getElementById("result").innerHTML = "<strong>Erreur :</strong> " + result.error;
-            document.getElementById("result").className = "error";
-            return;
-        }
-
-        const c = result.client;
-
-        document.getElementById("CustomerID").value = c.CustomerID;
-        document.getElementById("Recency").value = c.Recency;
-        document.getElementById("Frequency").value = c.Frequency;
-        document.getElementById("MonetaryTotal").value = c.MonetaryTotal;
-        document.getElementById("MonetaryAvg").value = c.MonetaryAvg;
-        document.getElementById("TotalQuantity").value = c.TotalQuantity;
-        document.getElementById("AvgDaysBetweenPurchases").value = c.AvgDaysBetweenPurchases;
-        document.getElementById("UniqueProducts").value = c.UniqueProducts;
-        document.getElementById("TotalTransactions").value = c.TotalTransactions;
-        document.getElementById("SupportTicketsCount").value = c.SupportTicketsCount;
-        document.getElementById("SatisfactionScore").value = c.SatisfactionScore;
-        document.getElementById("Age").value = c.Age;
-        document.getElementById("Gender").value = c.Gender;
-        document.getElementById("FavoriteSeason").value = c.FavoriteSeason;
-        document.getElementById("AccountStatus").value = c.AccountStatus;
-
-        document.getElementById("result").innerHTML =
-            "<strong>Client chargé :</strong> les champs ont été remplis depuis la base.";
-        document.getElementById("result").className = "result";
-    } catch (error) {
-        document.getElementById("result").innerHTML =
-            "<strong>Erreur :</strong> impossible de charger un client.";
-        document.getElementById("result").className = "error";
-    }
+function showError(msg) {
+    document.getElementById("resultsCard").classList.remove("visible");
+    var box = document.getElementById("errorBox");
+    box.style.display = "block";
+    box.textContent = msg;
 }
 
-async function predictChurn() {
-    const data = {
-        CustomerID: num("CustomerID"),
-        Recency: num("Recency"),
-        Frequency: num("Frequency"),
-        MonetaryTotal: num("MonetaryTotal"),
-        MonetaryAvg: num("MonetaryAvg"),
-        MonetaryStd: 20,
-        MonetaryMin: 40,
-        MonetaryMax: 150,
-        TotalQuantity: num("TotalQuantity"),
-        AvgQtyPerTrans: 4,
-        MinQuantity: 1,
-        MaxQuantity: 8,
-        CustomerTenureDays: 300,
-        FirstPurchaseDaysAgo: 320,
-        PreferredDay: 2,
-        PreferredHour: 14,
-        PreferredMonth: 5,
-        WeekendRatio: 0.3,
+function hideError() {
+    document.getElementById("errorBox").style.display = "none";
+}
+
+function riskClass(level) {
+    var map = { "Faible": "risk-faible", "Moyen": "risk-moyen", "Eleve": "risk-eleve", "Critique": "risk-critique" };
+    if (level === "Eleve" || level === "\u00c9lev\u00e9") return "risk-eleve";
+    return map[level] || "risk-faible";
+}
+
+function probaColor(p) {
+    if (p < 0.20) return "#43a047";
+    if (p < 0.40) return "#fb8c00";
+    if (p < 0.70) return "#f4511e";
+    return "#e53935";
+}
+
+function displayResults(p) {
+    hideError();
+
+    var churnBox = document.getElementById("churnBox");
+    var pred = parseInt(p.churn_pred);
+    // Couleur basee sur la prediction binaire (0=vert, 1=rouge)
+    churnBox.className = "metric-box " + (pred === 1 ? "risk-critique" : "risk-faible");
+    document.getElementById("riskLabel").textContent  = pred === 1 ? "CHURN DETECTE" : "CLIENT FIDELE";
+    document.getElementById("churnPred").textContent  = pred === 1 ? "1" : "0";
+    document.getElementById("churnSub").textContent   = "Risque " + p.risk_level + " (" + Math.round(parseFloat(p.churn_proba) * 100) + "%)";
+
+    document.getElementById("clusterLabel").textContent = p.cluster_label;
+    document.getElementById("clusterSub").textContent   = "Cluster " + p.cluster;
+
+    var monetary = parseFloat(p.monetary_pred);
+    document.getElementById("monetaryPred").textContent = "£" + monetary.toFixed(2);
+
+    var pct = Math.round(parseFloat(p.churn_proba) * 100);
+    document.getElementById("probaText").textContent      = pct + "%";
+    document.getElementById("probaBar").style.width       = pct + "%";
+    document.getElementById("probaBar").style.background  = probaColor(parseFloat(p.churn_proba));
+
+    document.getElementById("resultsCard").classList.add("visible");
+}
+
+function loadRandomClient() {
+    fetch("/random_client")
+        .then(function(res) { return res.json(); })
+        .then(function(result) {
+            if (!result.success) { showError("Erreur : " + result.error); return; }
+            var c = result.client;
+            document.getElementById("CustomerID").value              = c.CustomerID !== undefined ? c.CustomerID : "";
+            document.getElementById("Recency").value                 = c.Recency !== undefined ? c.Recency : "";
+            document.getElementById("Frequency").value               = c.Frequency !== undefined ? c.Frequency : "";
+            document.getElementById("MonetaryTotal").value           = c.MonetaryTotal !== undefined ? c.MonetaryTotal : "";
+            document.getElementById("MonetaryAvg").value             = c.MonetaryAvg !== undefined ? c.MonetaryAvg : "";
+            document.getElementById("TotalQuantity").value           = c.TotalQuantity !== undefined ? c.TotalQuantity : "";
+            document.getElementById("AvgDaysBetweenPurchases").value = c.AvgDaysBetweenPurchases !== undefined ? c.AvgDaysBetweenPurchases : "";
+            document.getElementById("UniqueProducts").value          = c.UniqueProducts !== undefined ? c.UniqueProducts : "";
+            document.getElementById("TotalTransactions").value       = c.TotalTransactions !== undefined ? c.TotalTransactions : "";
+            document.getElementById("SupportTicketsCount").value     = c.SupportTicketsCount !== undefined ? c.SupportTicketsCount : "";
+            document.getElementById("SatisfactionScore").value       = c.SatisfactionScore !== undefined ? c.SatisfactionScore : "";
+            document.getElementById("Age").value                     = c.Age !== undefined ? c.Age : "";
+            document.getElementById("Gender").value                  = c.Gender || "F";
+            document.getElementById("FavoriteSeason").value          = c.FavoriteSeason || "Printemps";
+            document.getElementById("AccountStatus").value           = c.AccountStatus || "Active";
+            hideError();
+            document.getElementById("resultsCard").classList.remove("visible");
+        })
+        .catch(function() { showError("Impossible de charger un client aleatoire."); });
+}
+
+function predictChurn() {
+    var data = {
+        CustomerID:              num("CustomerID"),
+        Recency:                 num("Recency"),
+        Frequency:               num("Frequency"),
+        MonetaryTotal:           num("MonetaryTotal"),
+        MonetaryAvg:             num("MonetaryAvg"),
+        TotalQuantity:           num("TotalQuantity"),
         AvgDaysBetweenPurchases: num("AvgDaysBetweenPurchases"),
-        UniqueProducts: num("UniqueProducts"),
-        UniqueDescriptions: 8,
-        AvgProdPerTrans: 2,
-        UniqueCountries: 1,
-        NegQtyCount: 0,
-        ZeroPriceCount: 0,
-        CancelledTrans: 0,
-        ReturnRatio: 0,
-        TotalTransactions: num("TotalTransactions"),
-        UniqueInvoices: 7,
-        AvgLinesPerInvoice: 2.3,
-        Age: num("Age"),
-        SupportTicketsCount: num("SupportTicketsCount"),
-        SatisfactionScore: num("SatisfactionScore"),
-        RFMSegment: "Champions",
-        AgeCategory: "35-44",
-        SpendingCategory: "Medium",
-        CustomerType: "Régulier",
-        FavoriteSeason: document.getElementById("FavoriteSeason").value,
-        PreferredTimeOfDay: "Après-midi",
-        Region: "UK",
-        LoyaltyLevel: "Établi",
-        ChurnRiskCategory: "Faible",
-        WeekendPreference: "Semaine",
-        BasketSizeCategory: "Moyen",
-        ProductDiversity: "Modéré",
-        Gender: document.getElementById("Gender").value,
-        AccountStatus: document.getElementById("AccountStatus").value,
-        Country: "UK",
-        NewsletterSubscribed: "Yes",
-        RegistrationDate: "12/03/2010",
-        LastLoginIP: "192.168.1.10"
+        UniqueProducts:          num("UniqueProducts"),
+        TotalTransactions:       num("TotalTransactions"),
+        SupportTicketsCount:     num("SupportTicketsCount"),
+        SatisfactionScore:       num("SatisfactionScore"),
+        Age:                     num("Age"),
+        Gender:                  document.getElementById("Gender").value,
+        FavoriteSeason:          document.getElementById("FavoriteSeason").value,
+        AccountStatus:           document.getElementById("AccountStatus").value
     };
 
-    try {
-        const response = await fetch("/predict", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(data)
-        });
-
-        const result = await response.json();
-
+    fetch("/predict", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify(data)
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(result) {
         if (result.success) {
-            const p = result.predictions[0];
-            document.getElementById("result").innerHTML =
-                "<strong>Probabilité :</strong> " + p.churn_proba +
-                "<br><strong>Risque :</strong> " + p.risk_level +
-                "<br><strong>Prédiction :</strong> " + p.churn_pred;
-            document.getElementById("result").className = "result";
+            displayResults(result.predictions[0]);
         } else {
-            document.getElementById("result").innerHTML =
-                "<strong>Erreur :</strong> " + result.error;
-            document.getElementById("result").className = "error";
+            showError("Erreur : " + result.error);
         }
-    } catch (error) {
-        document.getElementById("result").innerHTML =
-            "<strong>Erreur :</strong> impossible de contacter l'API.";
-        document.getElementById("result").className = "error";
-    }
+    })
+    .catch(function() { showError("Impossible de contacter l'API Flask."); });
 }
 </script>
+
+<!-- ═══════════════════════════════════════════════════════
+     VERIFICATION : comparer prediction vs valeur reelle
+     Retirer les commentaires pour activer ce bloc
+     ═══════════════════════════════════════════════════════
+ 
+<div class="card" style="margin-top: 0;">
+    <h1 style="font-size:18px;">Verification — Prediction vs Base de donnees</h1>
+    <p class="subtitle">Saisir un CustomerID existant pour comparer la prediction du modele avec la valeur reelle.</p>
+ 
+    <div style="display:flex; gap:12px; align-items:flex-end;">
+        <div class="field" style="flex:1;">
+            <label for="verifyID">Customer ID a verifier</label>
+            <input id="verifyID" type="number" placeholder="ex: 15484">
+        </div>
+        <button class="btn-predict" style="flex:0.4; margin-bottom:0;"
+                onclick="verifyClient()">Verifier</button>
+    </div>
+ 
+    <div id="verifyResult" style="margin-top:16px; display:none;">
+        <table style="width:100%; border-collapse:collapse; font-size:14px;">
+            <thead>
+                <tr style="background:#f5f5f5;">
+                    <th style="padding:10px; text-align:left; border:1px solid #ddd;">Champ</th>
+                    <th style="padding:10px; text-align:center; border:1px solid #ddd;">Valeur reelle (base)</th>
+                    <th style="padding:10px; text-align:center; border:1px solid #ddd;">Prediction modele</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="padding:10px; border:1px solid #ddd; font-weight:600;">Churn (0 ou 1)</td>
+                    <td style="padding:10px; text-align:center; border:1px solid #ddd;" id="vRealChurn">--</td>
+                    <td style="padding:10px; text-align:center; border:1px solid #ddd;" id="vPredChurn">--</td>
+                </tr>
+                <tr style="background:#f9f9f9;">
+                    <td style="padding:10px; border:1px solid #ddd; font-weight:600;">Probabilite</td>
+                    <td style="padding:10px; text-align:center; border:1px solid #ddd;">--</td>
+                    <td style="padding:10px; text-align:center; border:1px solid #ddd;" id="vProba">--</td>
+                </tr>
+                <tr>
+                    <td style="padding:10px; border:1px solid #ddd; font-weight:600;">Risque</td>
+                    <td style="padding:10px; text-align:center; border:1px solid #ddd;">--</td>
+                    <td style="padding:10px; text-align:center; border:1px solid #ddd;" id="vRisk">--</td>
+                </tr>
+                <tr style="background:#f9f9f9;">
+                    <td style="padding:10px; border:1px solid #ddd; font-weight:600;">Segment</td>
+                    <td style="padding:10px; text-align:center; border:1px solid #ddd;">--</td>
+                    <td style="padding:10px; text-align:center; border:1px solid #ddd;" id="vCluster">--</td>
+                </tr>
+                <tr>
+                    <td style="padding:10px; border:1px solid #ddd; font-weight:600;">Depense prevue</td>
+                    <td style="padding:10px; text-align:center; border:1px solid #ddd;">--</td>
+                    <td style="padding:10px; text-align:center; border:1px solid #ddd;" id="vMonetary">--</td>
+                </tr>
+            </tbody>
+        </table>
+ 
+        <div id="vMatch" style="margin-top:14px; padding:12px 16px; border-radius:8px;
+             font-size:15px; font-weight:600; text-align:center;"></div>
+    </div>
+</div>
+ 
+<script>
+function verifyClient() {
+    var id = document.getElementById("verifyID").value.trim();
+    if (!id) { alert("Saisis un CustomerID."); return; }
+ 
+    fetch("/verify/" + id)
+    .then(function(res) { return res.json(); })
+    .then(function(r) {
+        if (!r.success) { alert("Erreur : " + r.error); return; }
+ 
+        document.getElementById("verifyResult").style.display = "block";
+ 
+        var realLabel = r.real_churn === 1 ? "1 — Churn" : "0 — Fidele";
+        var predLabel = r.churn_pred  === 1 ? "1 — Churn" : "0 — Fidele";
+ 
+        document.getElementById("vRealChurn").textContent = realLabel;
+        document.getElementById("vPredChurn").textContent = predLabel;
+        document.getElementById("vProba").textContent     = Math.round(parseFloat(r.churn_proba) * 100) + "%";
+        document.getElementById("vRisk").textContent      = r.risk_level;
+        document.getElementById("vCluster").textContent   = r.cluster_label;
+        document.getElementById("vMonetary").textContent  = "£" + parseFloat(r.monetary_pred).toFixed(2);
+ 
+        var matchBox = document.getElementById("vMatch");
+        if (r.match) {
+            matchBox.style.background = "#e8f5e9";
+            matchBox.style.color      = "#1b5e20";
+            matchBox.textContent      = "Prediction correcte — le modele a bien predit le churn de ce client.";
+        } else {
+            matchBox.style.background = "#fce4ec";
+            matchBox.style.color      = "#b71c1c";
+            matchBox.textContent      = "Prediction incorrecte — le modele s\'est trompe sur ce client.";
+        }
+    })
+    .catch(function() { alert("Impossible de contacter l\'API."); });
+}
+</script>
+ 
+═══════════════════════════════════════════════════════ -->
+
+
+
+
 
 </body>
 </html>
