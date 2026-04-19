@@ -21,7 +21,7 @@ PCA_CLUSTER_PATH  = os.path.join(MODELS_DIR, "pca_cluster.pkl")
 REG_MODEL_PATH    = os.path.join(MODELS_DIR, "reg_model.pkl")
 SCALER_REG_PATH   = os.path.join(MODELS_DIR, "scaler_reg.pkl")
 REG_FEATURES_PATH = os.path.join(MODELS_DIR, "reg_features.pkl")
-
+KNN_AGE_PATH      = os.path.join(MODELS_DIR, "knn_age.pkl")
 _model         = None
 _scaler        = None
 _feature_names = None
@@ -32,12 +32,14 @@ _pca_cluster   = None
 _reg_model     = None
 _scaler_reg    = None
 _reg_features  = None
+_knn_age       = None
+
 
 
 def load_artifacts():
     global _model, _scaler, _feature_names, _country_means, _impute_values
     global _kmeans, _pca_cluster, _reg_model, _scaler_reg, _reg_features
-
+    global _knn_age 
     if _model is not None:
         return
 
@@ -52,6 +54,7 @@ def load_artifacts():
         "reg_model.pkl"    : REG_MODEL_PATH,
         "scaler_reg.pkl"   : SCALER_REG_PATH,
         "reg_features.pkl" : REG_FEATURES_PATH,
+        "knn_age.pkl"      : KNN_AGE_PATH,
     }
 
     for name, path in required.items():
@@ -73,7 +76,7 @@ def load_artifacts():
     _reg_model     = joblib.load(REG_MODEL_PATH)
     _scaler_reg    = joblib.load(SCALER_REG_PATH)
     _reg_features  = joblib.load(REG_FEATURES_PATH)
-
+    _knn_age       = joblib.load(KNN_AGE_PATH)
     print(f"[load] Artefacts charges — "
           f"{len(_feature_names)} features clf | {len(_reg_features)} features reg")
 

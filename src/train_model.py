@@ -350,9 +350,15 @@ def main():
     rmse = np.sqrt(mean_squared_error(y_reg_te, y_reg_pred))
     r2   = r2_score(y_reg_te, y_reg_pred)
 
-    print(f"  MAE  : {mae:.2f} £")
-    print(f"  RMSE : {rmse:.2f} £")
+# Calcul pourcentages
+    mean_monetary = y_reg_te.mean()
+    mae_pct  = (mae  / mean_monetary) * 100
+    rmse_pct = (rmse / mean_monetary) * 100
+
+    print(f"  MAE  : {mae:.2f} £  ({mae_pct:.1f}% de la dépense moyenne)")
+    print(f"  RMSE : {rmse:.2f} £  ({rmse_pct:.1f}% de la dépense moyenne)")
     print(f"  R²   : {r2:.4f}")
+    print(f"  Dépense moyenne test : {mean_monetary:.2f} £")
 
     sep("12. Sauvegarde des artefacts")
 
@@ -379,10 +385,9 @@ def main():
     print(f"  Classification AUC-ROC  : {auc:.4f}")
     print(f"  Classification F1 CV-5  : {cv_scores.mean():.4f} ± {cv_scores.std():.4f}")
     print(f"  Clustering              : 3 segments identifiés")
-    print(f"  Régression MAE          : {mae:.2f} £")
-    print(f"  Régression RMSE         : {rmse:.2f} £")
+    print(f"  Régression MAE          : {mae:.2f} £  ({mae_pct:.1f}%)")
+    print(f"  Régression RMSE         : {rmse:.2f} £  ({rmse_pct:.1f}%)")
     print(f"  Régression R²           : {r2:.4f}")
-    sep()
 
 
 if __name__ == "__main__":

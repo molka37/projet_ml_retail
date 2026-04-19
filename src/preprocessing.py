@@ -160,6 +160,13 @@ def transform_for_inference(
         if col in df.columns:
             df[col] = df[col].fillna(val)
 
+# KNN pour Age à l'inférence
+    BASE_DIR_INF = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    knn_age_path = os.path.join(BASE_DIR_INF, "models", "knn_age.pkl")
+    if os.path.exists(knn_age_path) and 'Age' in df.columns:
+        knn_age = joblib.load(knn_age_path)
+        df['Age'] = knn_age.transform(df[['Age']]).ravel()
+    
     df = encode_data(df, country_means=country_means)
     df = df.drop(columns=[c for c in LEAKAGE_COLS if c in df.columns], errors='ignore')
     df = df.reindex(columns=feature_names, fill_value=0)
@@ -210,6 +217,17 @@ if __name__ == "__main__":
 
     print(f"[impute] {len(impute_values)} colonnes imputées (médiane train)")
 
+# KNN Imputer pour Age
+    from sklearn.impute import KNNImputer
+    if 'Age' in X_train_raw.columns:
+        knn = KNNImputer(n_neighbors=5)
+    X_train_raw['Age'] = knn.fit_transform(
+        X_train_raw[['Age']]
+    ).ravel()
+    X_test_raw['Age'] = knn.transform(
+        X_test_raw[['Age']]
+    ).ravel()
+    print("[impute] Age → KNN Imputer (k=5) ✅")
     country_means = fit_country_encoder(X_train_raw, y_train)
 
     X_train_enc = encode_data(X_train_raw, country_means=country_means)
@@ -250,8 +268,8 @@ if __name__ == "__main__":
 
     joblib.dump(country_means, os.path.join(models_dir, "country_means.pkl"))
     joblib.dump(impute_values, os.path.join(models_dir, "impute_values.pkl"))
-    print(f"[save]  country_means + impute_values → {models_dir}")
-
+    joblib.dump(knn, os.path.join(models_dir, "knn_age.pkl"))
+    print(f"[save]  country_means + impute_values + knn_age → {models_dir}")
     print(f"\n{'='*55}")
     print(f"  X_train : {X_train_enc.shape}  (non scalé)")
     print(f"  X_test  : {X_test_enc.shape}   (non scalé)")
