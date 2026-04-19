@@ -17,7 +17,28 @@ from predict import predict
 
 TEMPLATE_DIR = os.path.join(CURRENT_DIR, "templates")
 app = Flask(__name__, template_folder=TEMPLATE_DIR)
+
 impute_values = joblib.load(IMPUTE_PATH)
+
+
+# CORRECTION : verification des colonnes au demarrage (PDF section 4)
+def check_columns():
+    """Verifie que les colonnes attendues sont presentes dans data.csv"""
+    try:
+        df = pd.read_csv(DATA_PATH, nrows=1)
+        expected = [
+            "CustomerID", "Frequency", "MonetaryTotal", "MonetaryAvg",
+            "TotalQuantity", "AvgDaysBetweenPurchases", "UniqueProducts",
+            "TotalTransactions", "SupportTicketsCount", "SatisfactionScore",
+            "Age", "Gender", "FavoriteSeason", "AccountStatus", "Churn"
+        ]
+        missing = [c for c in expected if c not in df.columns]
+        if missing:
+            print(f"[app] ATTENTION colonnes manquantes dans data.csv : {missing}")
+        else:
+            print("[app] Colonnes CSV verifiees OK")
+    except Exception as e:
+        print(f"[app] Impossible de lire data.csv : {e}")
 
 
 def normalize_gender(value):
@@ -50,7 +71,10 @@ def home():
 
 @app.route("/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ok", "message": "Flask API operationnelle"})
+    return jsonify({
+        "status": "ok",
+        "message": "Flask API operationnelle"
+    })
 
 
 @app.route("/random_client", methods=["GET"])
@@ -60,25 +84,33 @@ def random_client():
         sample = df.sample(1).iloc[0]
 
         client = {
-            "CustomerID":              safe_value(sample, "CustomerID", 0, int),
-            "Recency":                 safe_value(sample, "Recency", 0, int),
-            "Frequency":               safe_value(sample, "Frequency", 0, int),
-            "MonetaryTotal":           safe_value(sample, "MonetaryTotal", 0.0, float),
-            "MonetaryAvg":             safe_value(sample, "MonetaryAvg", 0.0, float),
-            "TotalQuantity":           safe_value(sample, "TotalQuantity", 0, int),
-            "AvgDaysBetweenPurchases": safe_value(sample, "AvgDaysBetweenPurchases",
-                                           impute_values.get("AvgDaysBetweenPurchases", 14.0), float),
-            "UniqueProducts":          safe_value(sample, "UniqueProducts", 0, int),
-            "TotalTransactions":       safe_value(sample, "TotalTransactions", 0, int),
-            "SupportTicketsCount":     safe_value(sample, "SupportTicketsCount",
-                                           impute_values.get("SupportTicketsCount", 2.0), int),
-            "SatisfactionScore":       safe_value(sample, "SatisfactionScore",
-                                           impute_values.get("SatisfactionScore", 3.0), float),
-            "Age":                     safe_value(sample, "Age",
-                                           impute_values.get("Age", 46.0), float),
-            "Gender":                  normalize_gender(safe_value(sample, "Gender", "F")),
-            "FavoriteSeason":          safe_value(sample, "FavoriteSeason", "Printemps", str),
-            "AccountStatus":           safe_value(sample, "AccountStatus", "Active", str),
+            "CustomerID"             : safe_value(sample, "CustomerID", 0, int),
+            "Frequency"              : safe_value(sample, "Frequency", 0, int),
+            "MonetaryTotal"          : safe_value(sample, "MonetaryTotal", 0.0, float),
+            "MonetaryAvg"            : safe_value(sample, "MonetaryAvg", 0.0, float),
+            "TotalQuantity"          : safe_value(sample, "TotalQuantity", 0, int),
+            # CORRECTION : nom de colonne verifie coherent avec le CSV
+            "AvgDaysBetweenPurchases": safe_value(
+                sample, "AvgDaysBetweenPurchases",
+                impute_values.get("AvgDaysBetweenPurchases", 14.0), float
+            ),
+            "UniqueProducts"         : safe_value(sample, "UniqueProducts", 0, int),
+            "TotalTransactions"      : safe_value(sample, "TotalTransactions", 0, int),
+            "SupportTicketsCount"    : safe_value(
+                sample, "SupportTicketsCount",
+                impute_values.get("SupportTicketsCount", 2.0), int
+            ),
+            "SatisfactionScore"      : safe_value(
+                sample, "SatisfactionScore",
+                impute_values.get("SatisfactionScore", 3.0), float
+            ),
+            "Age"                    : safe_value(
+                sample, "Age",
+                impute_values.get("Age", 46.0), float
+            ),
+            "Gender"                 : normalize_gender(safe_value(sample, "Gender", "F")),
+            "FavoriteSeason"         : safe_value(sample, "FavoriteSeason", "Printemps", str),
+            "AccountStatus"          : safe_value(sample, "AccountStatus", "Active", str),
         }
 
         return jsonify({"success": True, "client": client})
@@ -96,57 +128,63 @@ def predict_api():
         data = request.get_json()
 
         if data is None:
-            return jsonify({"error": "Aucune donnee JSON recue"}), 400
+            return jsonify({"success": False, "error": "Aucune donnee JSON recue"}), 400
 
         if isinstance(data, dict):
             df = pd.DataFrame([data])
         elif isinstance(data, list):
             df = pd.DataFrame(data)
         else:
-            return jsonify({"error": "Format JSON invalide"}), 400
+            return jsonify({"success": False, "error": "Format JSON invalide"}), 400
+
+        if df.empty:
+            return jsonify({"success": False, "error": "DataFrame vide"}), 400
 
         results = predict(df)
 
         return jsonify({
-            "success":     True,
-            "n_clients":   len(results),
+            "success"    : True,
+            "n_clients"  : len(results),
             "predictions": results.to_dict(orient="records")
         })
 
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
-# ── VERIFICATION : predit un client directement depuis la base ──────
+
 @app.route("/verify/<int:customer_id>", methods=["GET"])
 def verify(customer_id):
     try:
-        df = pd.read_csv(DATA_PATH)
- 
+        df  = pd.read_csv(DATA_PATH)
         row = df[df["CustomerID"] == customer_id]
+
         if row.empty:
-            return jsonify({"success": False, "error": f"CustomerID {customer_id} introuvable dans la base"}), 404
- 
-        # Valeur reelle du churn dans la base
+            return jsonify({
+                "success": False,
+                "error"  : f"CustomerID {customer_id} introuvable dans la base"
+            }), 404
+
         real_churn = int(row["Churn"].values[0]) if "Churn" in row.columns else None
- 
-        # Prediction du modele
+
         results = predict(row.reset_index(drop=True))
         pred    = results.to_dict(orient="records")[0]
- 
+
         return jsonify({
-            "success":      True,
-            "customer_id":  customer_id,
-            "real_churn":   real_churn,        # valeur reelle dans la base (0 ou 1)
-            "churn_pred":   pred["churn_pred"], # prediction du modele (0 ou 1)
-            "churn_proba":  pred["churn_proba"],
-            "risk_level":   pred["risk_level"],
+            "success"      : True,
+            "customer_id"  : customer_id,
+            "real_churn"   : real_churn,
+            "churn_pred"   : int(pred["churn_pred"]),
+            "churn_proba"  : float(pred["churn_proba"]),
+            "risk_level"   : pred["risk_level"],
             "cluster_label": pred["cluster_label"],
-            "monetary_pred": pred["monetary_pred"],
-            "match":        real_churn == pred["churn_pred"]  # True si identique
+            "monetary_pred": float(pred["monetary_pred"]),
+            "match"        : real_churn == int(pred["churn_pred"])
         })
- 
+
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
+
 if __name__ == "__main__":
+    check_columns()   # CORRECTION : verification colonnes au demarrage
     app.run(debug=True)
