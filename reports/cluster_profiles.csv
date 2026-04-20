@@ -1,4 +1,0 @@
-cluster,Churn_rate,Frequency_mean,MonetaryTotal_mean,AvgDays_mean,n_clients
-0,0.254,0.022,0.04,-0.224,771
-1,0.35,0.054,0.055,0.083,1599
-2,0.361,-0.092,-0.105,0.035,1127
