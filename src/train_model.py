@@ -26,7 +26,7 @@ from sklearn.metrics import (
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 optuna.logging.set_verbosity(optuna.logging.WARNING)
 
-N_PCA_COMPONENTS = 10  
+N_PCA_COMPONENTS = 19 
                     
 LEAKAGE_COLS = [
     'Recency',
@@ -57,7 +57,12 @@ REG_FEATURES = [
     'TotalTransactions',
     'SupportTicketsCount',
     'SatisfactionScore',
-    'Age'
+    'Age',
+    'MonetaryAvg',          # ajout
+    'AvgQuantityPerTransaction',  # nom correct
+    'NegativeQuantityCount',# ajout
+    'CancelledTransactions' # ajout
+
 ]
 REG_TARGET = 'MonetaryTotal'
 
@@ -149,34 +154,23 @@ def main():
 
     sep("5. Classification — Recherche Optuna (RandomForest)")
 
-    def objective(trial):
-        params = {
-            'n_estimators'     : trial.suggest_int('n_estimators', 50, 300),
-            'max_depth'        : trial.suggest_int('max_depth', 5, 20),
-            'min_samples_split': trial.suggest_int('min_samples_split', 2, 10),
-            'min_samples_leaf' : trial.suggest_int('min_samples_leaf', 1, 5),
-            'max_features'     : trial.suggest_categorical('max_features', ['sqrt', 'log2']),
-            'class_weight'     : 'balanced',
-            'random_state'     : 42,
-            'n_jobs'           : -1,
-        }
-        model = RandomForestClassifier(**params)
-        return cross_val_score(model, X_train_s, y_train, cv=3, scoring='f1').mean()
+    
+    best_params = {
+        'n_estimators'     : 211,
+        'max_depth'        : 16,
+        'min_samples_split': 6,
+        'min_samples_leaf' : 4,
+        'max_features'     : 'sqrt',
+        'class_weight'     : 'balanced',
+        'random_state'     : 42,
+        'n_jobs'           : -1
+    }
 
-    study = optuna.create_study(direction='maximize')
-    study.optimize(objective, n_trials=20, show_progress_bar=True)
-
-    print(f"\n  Meilleurs paramètres : {study.best_params}")
-    print(f"  Meilleur F1 CV-3     : {study.best_value:.4f}")
+    print(f"\n  Parametres fixes : {best_params}")
+    print(f"  (Meilleurs parametres trouves lors de l'optimisation precedente)")
 
     sep("6. Entraînement du modèle final de classification")
-
-    best_params = {
-        **study.best_params,
-        'class_weight': 'balanced',
-        'random_state': 42,
-        'n_jobs'      : -1
-    }
+    
 
     best_model = RandomForestClassifier(**best_params)
     best_model.fit(X_train_s, y_train)
@@ -327,7 +321,7 @@ def main():
         df_reg[col] = pd.to_numeric(df_reg[col], errors='coerce')
         df_reg[col] = df_reg[col].fillna(df_reg[col].median())
 
-    Q1_r, Q3_r = df_reg[REG_TARGET].quantile([0.01, 0.99])
+    Q1_r, Q3_r = df_reg[REG_TARGET].quantile([0.05, 0.95])    
     df_reg = df_reg[(df_reg[REG_TARGET] >= Q1_r) & (df_reg[REG_TARGET] <= Q3_r)]
     print(f"  Outliers MonetaryTotal retirés — {len(df_reg)} lignes conservées")
 
@@ -342,7 +336,15 @@ def main():
     X_reg_tr_s   = scaler_reg.fit_transform(X_reg_tr)
     X_reg_te_s   = scaler_reg.transform(X_reg_te)
 
-    reg_model = RandomForestRegressor(n_estimators=200, random_state=42, n_jobs=-1)
+    reg_model = RandomForestRegressor(
+        n_estimators=800,      # plus d'arbres
+        max_depth=25,          # arbres plus profonds
+        min_samples_split=3,   # splits plus fins
+        min_samples_leaf=1,    # feuilles plus petites
+        max_features='sqrt',   # meilleures features par split
+        random_state=42,
+        n_jobs=-1
+    )   
     reg_model.fit(X_reg_tr_s, y_reg_tr)
 
     y_reg_pred = reg_model.predict(X_reg_te_s)
@@ -350,7 +352,6 @@ def main():
     rmse = np.sqrt(mean_squared_error(y_reg_te, y_reg_pred))
     r2   = r2_score(y_reg_te, y_reg_pred)
 
-# Calcul pourcentages
     mean_monetary = y_reg_te.mean()
     mae_pct  = (mae  / mean_monetary) * 100
     rmse_pct = (rmse / mean_monetary) * 100

@@ -1,280 +1,303 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <title>Prediction Churn - Retail ML</title>
-    <style>
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: Arial, sans-serif; background: #f0f2f5; padding: 32px 16px; color: #222; }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prediction Churn Client — ML Retail</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f7fafc;
+      min-height: 100vh;
+      padding: 2rem 1rem;
+      color: #2d3748;
+    }
+    .container { max-width: 720px; margin: 0 auto; }
 
-        .card {
-            background: #fff;
-            border-radius: 12px;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-            max-width: 860px;
-            margin: 0 auto 24px;
-            padding: 28px 32px;
-        }
+    .header {
+      background: #1a365d;
+      color: white;
+      padding: 1.25rem 1.5rem;
+      border-radius: 12px 12px 0 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .header h1 { font-size: 1.15rem; font-weight: 500; }
+    .header span { font-size: 0.85rem; opacity: 0.7; }
 
-        h1 { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
-        .subtitle { font-size: 13px; color: #666; margin-bottom: 24px; }
+    .card {
+      background: white;
+      padding: 1.5rem;
+      border: 1px solid #e2e8f0;
+    }
+    .card-last { border-radius: 0 0 12px 12px; margin-bottom: 1.5rem; }
 
-        .grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 14px 20px;
-        }
+    .section-title {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: #718096;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 1rem;
+    }
 
-        .field {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px 16px;
+      margin-bottom: 1rem;
+    }
 
-        label {
-            font-size: 13px;
-            font-weight: 600;
-            color: #444;
-        }
+    .field { display: flex; flex-direction: column; gap: 5px; }
 
-        input, select {
-            padding: 9px 12px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            font-size: 14px;
-            width: 100%;
-            transition: border-color .2s;
-        }
+    label {
+      font-size: 12px;
+      font-weight: 500;
+      color: #4a5568;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
 
-        input:focus, select:focus {
-            outline: none;
-            border-color: #007bff;
-        }
+    input, select {
+      padding: 8px 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 14px;
+      width: 100%;
+      color: #2d3748;
+      background: #f7fafc;
+      transition: border-color .2s, background .2s;
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: #4299e1;
+      background: white;
+    }
 
-        .btn-row {
-            display: flex;
-            gap: 12px;
-            margin-top: 20px;
-        }
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 1rem;
+    }
 
-        button {
-            flex: 1;
-            padding: 11px;
-            border: none;
-            border-radius: 6px;
-            font-size: 15px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: opacity .2s, transform .1s;
-        }
+    .btn {
+      flex: 1;
+      padding: 11px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .2s, transform .1s;
+    }
+    .btn:hover { opacity: 0.87; }
+    .btn:active { transform: scale(0.98); }
+    .btn-random  { background: #276749; color: white; }
+    .btn-predict { background: #2b6cb0; color: white; }
+    .btn-verify  { flex: 0.7; background: #553c9a; color: white; }
 
-        button:active { transform: scale(0.98); }
-        button:hover { opacity: .88; }
+    .divider { border: none; border-top: 1px solid #edf2f7; margin: 1rem 0; }
 
-        .btn-random { background: #28a745; color: #fff; }
-        .btn-predict { background: #007bff; color: #fff; }
+    .results-wrap { display: none; margin-bottom: 1.5rem; }
+    .results-wrap.visible { display: block; }
 
-        .results-card {
-            background: #fff;
-            border-radius: 12px;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-            max-width: 860px;
-            margin: 0 auto;
-            padding: 28px 32px;
-            display: none;
-        }
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 1rem;
+    }
+    .metric {
+      padding: 1rem;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .metric-label {
+      font-size: 0.7rem;
+      font-weight: 500;
+      color: #718096;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 6px;
+    }
+    .metric-value { font-size: 1.6rem; font-weight: 600; }
+    .metric-sub   { font-size: 0.75rem; margin-top: 4px; }
 
-        .results-card.visible { display: block; }
-        .results-title { font-size: 16px; font-weight: 600; margin-bottom: 18px; color: #333; }
+    .risk-faible   { background: #ebf8ff; }
+    .risk-faible .metric-label { color: #2c5282; }
+    .risk-faible .metric-value { color: #2b6cb0; }
+    .risk-faible .metric-sub   { color: #2b6cb0; }
 
-        .metrics-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 14px;
-            margin-bottom: 20px;
-        }
+    .risk-moyen   { background: #fffff0; }
+    .risk-moyen .metric-label { color: #744210; }
+    .risk-moyen .metric-value { color: #b7791f; }
+    .risk-moyen .metric-sub   { color: #b7791f; }
 
-        .metric-box {
-            border-radius: 8px;
-            padding: 16px;
-            text-align: center;
-        }
+    .risk-eleve   { background: #fffaf0; }
+    .risk-eleve .metric-label { color: #7b341e; }
+    .risk-eleve .metric-value { color: #c05621; }
+    .risk-eleve .metric-sub   { color: #c05621; }
 
-        .metric-label {
-            font-size: 12px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: .04em;
-            margin-bottom: 6px;
-        }
+    .risk-critique { background: #fff5f5; }
+    .risk-critique .metric-label { color: #742a2a; }
+    .risk-critique .metric-value { color: #c53030; }
+    .risk-critique .metric-sub   { color: #c53030; }
 
-        .metric-value {
-            font-size: 24px;
-            font-weight: 700;
-        }
+    .risk-fidele { background: #f0fff4; }
+    .risk-fidele .metric-label { color: #276749; }
+    .risk-fidele .metric-value { color: #276749; }
+    .risk-fidele .metric-sub   { color: #276749; }
 
-        .metric-sub {
-            font-size: 12px;
-            margin-top: 4px;
-        }
+    .seg-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 1rem;
+    }
+    .seg-box {
+      background: #f7fafc;
+      border-radius: 8px;
+      padding: 1rem;
+    }
+    .seg-label {
+      font-size: 0.7rem;
+      font-weight: 500;
+      color: #718096;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+    .seg-value { font-size: 1.1rem; font-weight: 600; color: #2d3748; }
+    .seg-sub   { font-size: 0.75rem; color: #718096; margin-top: 3px; }
 
-        .risk-faible { background: #e8f5e9; }
-        .risk-faible .metric-label { color: #2e7d32; }
-        .risk-faible .metric-value { color: #1b5e20; }
+    .bar-wrap {
+      background: #edf2f7;
+      border-radius: 4px;
+      height: 7px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    .bar-fill { height: 100%; border-radius: 4px; transition: width .6s ease; }
+    .bar-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: #718096;
+      margin-bottom: 4px;
+    }
 
-        .risk-moyen { background: #fff8e1; }
-        .risk-moyen .metric-label { color: #f57f17; }
-        .risk-moyen .metric-value { color: #e65100; }
+    .alert-ok {
+      background: #f0fff4;
+      border: 1px solid #9ae6b4;
+      border-radius: 8px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: #276749;
+    }
+    .dot-ok { width: 8px; height: 8px; border-radius: 50%; background: #276749; flex-shrink: 0; }
 
-        .risk-eleve { background: #fff3e0; }
-        .risk-eleve .metric-label { color: #e65100; }
-        .risk-eleve .metric-value { color: #bf360c; }
-
-        .risk-critique { background: #fce4ec; }
-        .risk-critique .metric-label { color: #c62828; }
-        .risk-critique .metric-value { color: #b71c1c; }
-
-        .cluster-box { background: #e3f2fd; }
-        .cluster-box .metric-label { color: #1565c0; }
-        .cluster-box .metric-value { font-size: 16px; color: #0d47a1; }
-
-        .reg-box { background: #f3e5f5; }
-        .reg-box .metric-label { color: #6a1b9a; }
-        .reg-box .metric-value { color: #4a148c; }
-
-        .proba-section { margin-top: 4px; }
-        .proba-label {
-            display: flex;
-            justify-content: space-between;
-            font-size: 13px;
-            color: #555;
-            margin-bottom: 6px;
-        }
-
-        .proba-bar-bg {
-            height: 10px;
-            background: #e0e0e0;
-            border-radius: 5px;
-            overflow: hidden;
-        }
-
-        .proba-bar-fill {
-            height: 100%;
-            border-radius: 5px;
-            transition: width .5s ease;
-        }
-
-        .error-box {
-            background: #fdeaea;
-            border-left: 4px solid #e53935;
-            border-radius: 6px;
-            padding: 14px 16px;
-            color: #b71c1c;
-            font-size: 14px;
-            max-width: 860px;
-            margin: 16px auto;
-            display: none;
-        }
-    </style>
+    .error-box {
+      background: #fff5f5;
+      border: 1px solid #feb2b2;
+      border-radius: 8px;
+      padding: 12px 16px;
+      color: #c53030;
+      font-size: 13px;
+      margin-bottom: 1rem;
+      display: none;
+    }
+  </style>
 </head>
 <body>
+<div class="container">
 
-<div class="card">
+  <!-- Header -->
+  <div class="header">
     <h1>Prediction Churn Client</h1>
-    <p class="subtitle">Classification · Clustering · Regression — Retail E-commerce</p>
+    <span>Classification · Clustering · Regression — ML Retail</span>
+  </div>
 
+  <!-- Formulaire -->
+  <div class="card">
+    <p class="section-title">Informations client</p>
     <div class="grid">
-        <div class="field">
-            <label for="CustomerID">Customer ID</label>
-            <input id="CustomerID" type="number" value="15484">
-        </div>
-
-        <div class="field">
-            <label for="Gender">Genre</label>
-            <select id="Gender">
-                <option value="F">Femme</option>
-                <option value="M">Homme</option>
-            </select>
-        </div>
-
-
-        <div class="field">
-            <label for="Frequency">Frequency (commandes)</label>
-            <input id="Frequency" type="number" value="5">
-        </div>
-
-        <div class="field">
-            <label for="MonetaryTotal">Monetary Total (£)</label>
-            <input id="MonetaryTotal" type="number" step="any" value="450.5">
-        </div>
-
-        <div class="field">
-            <label for="MonetaryAvg">Monetary Avg (£)</label>
-            <input id="MonetaryAvg" type="number" step="any" value="90">
-        </div>
-
-        <div class="field">
-            <label for="TotalQuantity">Total Quantity</label>
-            <input id="TotalQuantity" type="number" value="20">
-        </div>
-
-        <div class="field">
-            <label for="AvgDaysBetweenPurchases">Avg Days Between Purchases</label>
-            <input id="AvgDaysBetweenPurchases" type="number" step="any" value="18">
-        </div>
-
-        <div class="field">
-            <label for="UniqueProducts">Unique Products</label>
-            <input id="UniqueProducts" type="number" value="10">
-        </div>
-
-        <div class="field">
-            <label for="TotalTransactions">Total Transactions</label>
-            <input id="TotalTransactions" type="number" value="7">
-        </div>
-
-        <div class="field">
-            <label for="SupportTicketsCount">Support Tickets</label>
-            <input id="SupportTicketsCount" type="number" value="1">
-        </div>
-
-        <div class="field">
-            <label for="SatisfactionScore">Satisfaction Score (1-5)</label>
-            <input id="SatisfactionScore" type="number" step="any" value="4">
-        </div>
-
-        <div class="field">
-            <label for="Age">Age</label>
-            <input id="Age" type="number" step="any" value="35">
-        </div>
-
-        <div class="field">
-            <label for="FavoriteSeason">Saison preferee</label>
-            <select id="FavoriteSeason">
-                <option value="Hiver">Hiver</option>
-                <option value="Printemps" selected>Printemps</option>
-                <option value="Été">Ete</option>
-                <option value="Automne">Automne</option>
-            </select>
-        </div>
-
-        <div class="field">
-            <label for="AccountStatus">Statut du compte</label>
-            <select id="AccountStatus">
-                <option value="Active" selected>Active</option>
-                <option value="Suspended">Suspended</option>
-                <option value="Pending">Pending</option>
-                <option value="Closed">Closed</option>
-            </select>
-        </div>
+      <div class="field">
+        <label for="CustomerID">Customer ID</label>
+        <input id="CustomerID" type="number" value="15484">
+      </div>
+      <div class="field">
+        <label for="Gender">Genre</label>
+        <select id="Gender">
+          <option value="F">Femme</option>
+          <option value="M">Homme</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="Frequency">Frequency (commandes)</label>
+        <input id="Frequency" type="number" value="5">
+      </div>
+      <div class="field">
+        <label for="MonetaryTotal">Monetary Total (£)</label>
+        <input id="MonetaryTotal" type="number" step="0.01" value="450.50">
+      </div>
+      <div class="field">
+        <label for="MonetaryAvg">Monetary Avg (£)</label>
+        <input id="MonetaryAvg" type="number" step="0.01" value="90.00">
+      </div>
+      <div class="field">
+        <label for="TotalQuantity">Total Quantity</label>
+        <input id="TotalQuantity" type="number" value="20">
+      </div>
+      <div class="field">
+        <label for="AvgDaysBetweenPurchases">Avg Days Between Purchases</label>
+        <input id="AvgDaysBetweenPurchases" type="number" step="0.1" value="18.0">
+      </div>
+      <div class="field">
+        <label for="UniqueProducts">Unique Products</label>
+        <input id="UniqueProducts" type="number" value="10">
+      </div>
+      <div class="field">
+        <label for="TotalTransactions">Total Transactions</label>
+        <input id="TotalTransactions" type="number" value="7">
+      </div>
+      <div class="field">
+        <label for="SupportTicketsCount">Support Tickets</label>
+        <input id="SupportTicketsCount" type="number" value="1">
+      </div>
+      <div class="field">
+        <label for="SatisfactionScore">Satisfaction Score (1-5)</label>
+        <input id="SatisfactionScore" type="number" step="1" value="4">
+      </div>
+      <div class="field">
+        <label for="Age">Age</label>
+        <input id="Age" type="number" value="35">
+      </div>
+      <div class="field">
+        <label for="FavoriteSeason">Saison preferee</label>
+        <select id="FavoriteSeason">
+          <option value="Hiver">Hiver</option>
+          <option value="Printemps" selected>Printemps</option>
+          <option value="Été">Ete</option>
+          <option value="Automne">Automne</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="AccountStatus">Statut du compte</label>
+        <select id="AccountStatus">
+          <option value="Active" selected>Active</option>
+          <option value="Suspended">Suspended</option>
+          <option value="Pending">Pending</option>
+          <option value="Closed">Closed</option>
+        </select>
+      </div>
     </div>
 
-    </div>
-
-    <!-- Champs cachés : envoyés dans le payload mais non affichés dans le formulaire -->
-    <!-- CORRECTION ERREUR : Country, Region, RegistrationDate, RFMSegment, CustomerType, -->
-    <!-- WeekendPreference, ProductDiversity sont nécessaires pour transform_for_inference -->
-    <!-- Sans eux : RegYear/RegMonth/Country_encoded = 0 → biais silencieux              -->
     <input type="hidden" id="Country"           value="United Kingdom">
     <input type="hidden" id="Region"            value="UK">
     <input type="hidden" id="RegistrationDate"  value="">
@@ -284,223 +307,250 @@
     <input type="hidden" id="ProductDiversity"  value="Modere">
 
     <div class="btn-row">
-        <button class="btn-random" onclick="loadRandomClient()">Client aleatoire</button>
-        <button class="btn-predict" id="predictBtn" onclick="predictChurn()">Predire</button>
+      <button class="btn btn-random" onclick="loadRandomClient()">Client aleatoire</button>
+      <button class="btn btn-predict" id="predictBtn" onclick="predictChurn()">Predire</button>
+      <button class="btn btn-verify" onclick="verifyClient()">Verifier</button>
     </div>
+  </div>
+
+  <!-- Erreur -->
+  <div class="error-box" id="errorBox"></div>
+
+  <!-- Résultats -->
+  <div class="results-wrap" id="resultsWrap">
+    <div class="header" style="border-radius:12px 12px 0 0;">
+      <h1>Resultats de la prediction</h1>
+      <span id="resultCustomerId">Customer #--</span>
+    </div>
+    <div class="card">
+      <p class="section-title">Resultat de la prediction</p>
+      <div class="metrics-grid">
+        <div class="metric" id="churnBox">
+          <div class="metric-label" id="riskLabel">Churn predit</div>
+          <div class="metric-value" id="churnPred">--</div>
+          <div class="metric-sub" id="churnSub"></div>
+        </div>
+        <div class="metric risk-fidele">
+          <div class="metric-label">Probabilite</div>
+          <div class="metric-value" id="probaValue">--</div>
+          <div class="metric-sub" id="probaLevel"></div>
+        </div>
+        <div class="metric" id="riskBox">
+          <div class="metric-label">Niveau risque</div>
+          <div class="metric-value" id="riskValue">--</div>
+          <div class="metric-sub" id="riskSub"></div>
+        </div>
+      </div>
+
+      <div class="bar-label">
+        <span>Probabilite de churn</span>
+        <span id="probaText" style="font-weight:500;">--</span>
+      </div>
+      <div class="bar-wrap">
+        <div class="bar-fill" id="probaBar" style="width:0%;background:#3182ce;"></div>
+      </div>
+
+      <hr class="divider">
+
+      <p class="section-title">Segmentation et valeur</p>
+      <div class="seg-grid">
+        <div class="seg-box">
+          <div class="seg-label">Segment client</div>
+          <div class="seg-value" id="clusterLabel">--</div>
+          <div class="seg-sub" id="clusterDesc"></div>
+        </div>
+        <div class="seg-box">
+          <div class="seg-label">Depense estimee</div>
+          <div class="seg-value" id="monetaryPred">--</div>
+          <div class="seg-sub">MonetaryTotal estime</div>
+        </div>
+      </div>
+
+      <div class="alert-ok" id="alertBox" style="display:none;">
+        <div class="dot-ok"></div>
+        <span id="alertText"></span>
+      </div>
+    </div>
+  </div>
+
 </div>
-
-<div class="results-card" id="resultsCard">
-    <div class="results-title">Resultats de la prediction</div>
-
-    <div class="metrics-grid">
-        <div class="metric-box" id="churnBox">
-            <div class="metric-label" id="riskLabel">Risque Churn</div>
-            <div class="metric-value" id="churnPred">--</div>
-            <div class="metric-sub" id="churnSub"></div>
-        </div>
-
-        <div class="metric-box cluster-box">
-            <div class="metric-label">Segment client</div>
-            <div class="metric-value" id="clusterLabel">--</div>
-            <div class="metric-sub" id="clusterSub"></div>
-        </div>
-
-        <div class="metric-box reg-box">
-            <div class="metric-label">Depense prevue</div>
-            <div class="metric-value" id="monetaryPred">--</div>
-            <div class="metric-sub">MonetaryTotal estime</div>
-        </div>
-    </div>
-
-    <div class="proba-section">
-        <div class="proba-label">
-            <span>Probabilite de churn</span>
-            <span id="probaText">--</span>
-        </div>
-        <div class="proba-bar-bg">
-            <div class="proba-bar-fill" id="probaBar" style="width:0%; background:#e53935;"></div>
-        </div>
-    </div>
-</div>
-
-<div class="error-box" id="errorBox"></div>
 
 <script>
+const clusterDescriptions = {
+  "Cluster 0": "Meilleurs clients — Reactivation prioritaire",
+  "Cluster 1": "Actifs standard — Fidelisation ciblee",
+  "Cluster 2": "Faible valeur — Retention urgente",
+};
+
 function num(id) {
-    const v = document.getElementById(id).value.trim();
-    if (v === "") return null;
-    const n = Number(v);
-    return isNaN(n) ? null : n;
+  const v = document.getElementById(id).value.trim();
+  if (v === "") return null;
+  const n = Number(v);
+  return isNaN(n) ? null : n;
 }
 
 function showError(msg) {
-    document.getElementById("resultsCard").classList.remove("visible");
-    const box = document.getElementById("errorBox");
-    box.style.display = "block";
-    box.textContent = msg;
+  document.getElementById("resultsWrap").classList.remove("visible");
+  const box = document.getElementById("errorBox");
+  box.style.display = "block";
+  box.textContent = "Erreur : " + msg;
 }
 
 function hideError() {
-    document.getElementById("errorBox").style.display = "none";
+  document.getElementById("errorBox").style.display = "none";
 }
 
-function probaColor(p) {
-    if (p < 0.20) return "#43a047";
-    if (p < 0.40) return "#fb8c00";
-    if (p < 0.70) return "#f4511e";
-    return "#e53935";
+function barColor(p) {
+  if (p < 0.20) return "#3182ce";
+  if (p < 0.40) return "#d69e2e";
+  if (p < 0.70) return "#dd6b20";
+  return "#e53e3e";
 }
 
-function metricRiskClass(level, pred) {
-    if (pred === 1) return "risk-critique";
-    if (level === "Faible") return "risk-faible";
-    if (level === "Moyen") return "risk-moyen";
-    if (level === "Élevé" || level === "Eleve") return "risk-eleve";
-    if (level === "Critique") return "risk-critique";
-    return "risk-faible";
+function riskClass(level, pred) {
+  if (pred === 0) return "risk-fidele";
+  if (level === "Faible")   return "risk-faible";
+  if (level === "Moyen")    return "risk-moyen";
+  if (level === "Eleve" || level === "Élevé") return "risk-eleve";
+  return "risk-critique";
 }
 
 function displayResults(p) {
-    hideError();
+  hideError();
+  const pred = parseInt(p.churn_pred);
+  const proba = parseFloat(p.churn_proba);
+  const pct = Math.round(proba * 100);
+  const cid = document.getElementById("CustomerID").value;
 
-    const churnBox = document.getElementById("churnBox");
-    const pred = parseInt(p.churn_pred);
+  document.getElementById("resultCustomerId").textContent = "Customer #" + cid;
 
-    churnBox.className = "metric-box " + metricRiskClass(p.risk_level, pred);
+  const churnBox = document.getElementById("churnBox");
+  churnBox.className = "metric " + (pred === 0 ? "risk-fidele" : "risk-critique");
+  document.getElementById("riskLabel").textContent = pred === 0 ? "CLIENT FIDELE" : "CHURN DETECTE";
+  document.getElementById("churnPred").textContent = pred;
+  document.getElementById("churnSub").textContent  = pred === 0 ? "Fidele confirme" : "Churner detecte";
 
-    document.getElementById("riskLabel").textContent =
-        pred === 1 ? "CHURN DETECTE" : "CLIENT FIDELE";
+  document.getElementById("probaValue").textContent = pct + "%";
+  document.getElementById("probaLevel").textContent = p.risk_level;
+  document.getElementById("probaText").textContent  = pct + "%";
+  document.getElementById("probaText").style.color  = barColor(proba);
 
-    document.getElementById("churnPred").textContent =
-        pred === 1 ? "1" : "0";
+  const riskBox = document.getElementById("riskBox");
+  riskBox.className = "metric " + riskClass(p.risk_level, pred);
+  document.getElementById("riskValue").textContent = p.risk_level;
+  document.getElementById("riskSub").textContent   = pct + "% churn";
 
-    document.getElementById("churnSub").textContent =
-        "Risque " + p.risk_level + " (" + Math.round(parseFloat(p.churn_proba) * 100) + "%)";
+  document.getElementById("probaBar").style.width      = pct + "%";
+  document.getElementById("probaBar").style.background = barColor(proba);
 
-    document.getElementById("clusterLabel").textContent = p.cluster_label;
-    document.getElementById("clusterSub").textContent = "Cluster " + p.cluster;
+  document.getElementById("clusterLabel").textContent = p.cluster_label;
+  document.getElementById("clusterDesc").textContent  = clusterDescriptions[p.cluster_label] || p.cluster_label;
 
-    const monetary = parseFloat(p.monetary_pred);
-    document.getElementById("monetaryPred").textContent = "£" + monetary.toFixed(2);
+  const monetary = parseFloat(p.monetary_pred);
+  document.getElementById("monetaryPred").textContent = "£" + monetary.toLocaleString("fr-FR", {minimumFractionDigits:2, maximumFractionDigits:2});
 
-    const pct = Math.round(parseFloat(p.churn_proba) * 100);
-    document.getElementById("probaText").textContent = pct + "%";
-    document.getElementById("probaBar").style.width = pct + "%";
-    document.getElementById("probaBar").style.background = probaColor(parseFloat(p.churn_proba));
+  const alertBox  = document.getElementById("alertBox");
+  const alertText = document.getElementById("alertText");
+  alertBox.style.display = "flex";
+  alertText.textContent = pred === 0
+    ? "Client fidele identifie avec succes — risque de churn faible"
+    : "Alerte churn detectee — action marketing recommandee";
 
-    document.getElementById("resultsCard").classList.add("visible");
+  document.getElementById("resultsWrap").classList.add("visible");
+  document.getElementById("resultsWrap").scrollIntoView({behavior:"smooth", block:"start"});
 }
 
 function setPredictLoading(isLoading) {
-    const btn = document.getElementById("predictBtn");
-    if (!btn) return;
-
-    if (isLoading) {
-        btn.disabled = true;
-        btn.textContent = "Chargement...";
-        btn.style.opacity = "0.7";
-    } else {
-        btn.disabled = false;
-        btn.textContent = "Predire";
-        btn.style.opacity = "1";
-    }
+  const btn = document.getElementById("predictBtn");
+  if (!btn) return;
+  btn.disabled    = isLoading;
+  btn.textContent = isLoading ? "Chargement..." : "Predire";
+  btn.style.opacity = isLoading ? "0.7" : "1";
 }
 
 function loadRandomClient() {
-    fetch("/random_client")
-        .then(res => res.json())
-        .then(result => {
-            if (!result.success) {
-                showError("Erreur : " + result.error);
-                return;
-            }
-
-            const c = result.client;
-
-            document.getElementById("CustomerID").value = c.CustomerID ?? "";
-            document.getElementById("Frequency").value = c.Frequency ?? "";
-            document.getElementById("MonetaryTotal").value = c.MonetaryTotal ?? "";
-            document.getElementById("MonetaryAvg").value = c.MonetaryAvg ?? "";
-            document.getElementById("TotalQuantity").value = c.TotalQuantity ?? "";
-            document.getElementById("AvgDaysBetweenPurchases").value = c.AvgDaysBetweenPurchases ?? "";
-            document.getElementById("UniqueProducts").value = c.UniqueProducts ?? "";
-            document.getElementById("TotalTransactions").value = c.TotalTransactions ?? "";
-            document.getElementById("SupportTicketsCount").value = c.SupportTicketsCount ?? "";
-            document.getElementById("SatisfactionScore").value = c.SatisfactionScore ?? "";
-            document.getElementById("Age").value = c.Age ?? "";
-            document.getElementById("Gender").value = c.Gender || "F";
-            document.getElementById("FavoriteSeason").value = c.FavoriteSeason || "Printemps";
-            document.getElementById("AccountStatus").value = c.AccountStatus || "Active";
-
-            // CORRECTION WARN : remplir les champs cachés depuis random_client
-            // Évite que Country_encoded / RegYear / RegMonth soient à 0 lors de la prédiction
-            document.getElementById("Country").value           = c.Country           || "United Kingdom";
-            document.getElementById("Region").value            = c.Region            || "UK";
-            document.getElementById("RegistrationDate").value  = c.RegistrationDate  || "";
-            document.getElementById("RFMSegment").value        = c.RFMSegment        || "Potentiels";
-            document.getElementById("CustomerType").value      = c.CustomerType      || "Regulier";
-            document.getElementById("WeekendPreference").value = c.WeekendPreference || "Semaine";
-            document.getElementById("ProductDiversity").value  = c.ProductDiversity  || "Modere";
-
-            hideError();
-            document.getElementById("resultsCard").classList.remove("visible");
-        })
-        .catch(() => {
-            showError("Impossible de charger un client aleatoire.");
-        });
+  fetch("/random_client")
+    .then(r => r.json())
+    .then(result => {
+      if (!result.success) { showError(result.error); return; }
+      const c = result.client;
+      document.getElementById("CustomerID").value             = c.CustomerID ?? "";
+      document.getElementById("Frequency").value              = c.Frequency ?? "";
+      document.getElementById("MonetaryTotal").value          = c.MonetaryTotal != null ? parseFloat(c.MonetaryTotal).toFixed(2) : "";
+      document.getElementById("MonetaryAvg").value            = c.MonetaryAvg != null ? parseFloat(c.MonetaryAvg).toFixed(2) : "";
+      document.getElementById("TotalQuantity").value          = c.TotalQuantity ?? "";
+      document.getElementById("AvgDaysBetweenPurchases").value= c.AvgDaysBetweenPurchases != null ? parseFloat(c.AvgDaysBetweenPurchases).toFixed(1) : "";
+      document.getElementById("UniqueProducts").value         = c.UniqueProducts ?? "";
+      document.getElementById("TotalTransactions").value      = c.TotalTransactions ?? "";
+      document.getElementById("SupportTicketsCount").value    = c.SupportTicketsCount ?? "";
+      document.getElementById("SatisfactionScore").value      = c.SatisfactionScore ?? "";
+      document.getElementById("Age").value                    = c.Age != null ? Math.round(c.Age) : "";
+      document.getElementById("Gender").value                 = c.Gender || "F";
+      document.getElementById("FavoriteSeason").value         = c.FavoriteSeason || "Printemps";
+      document.getElementById("AccountStatus").value          = c.AccountStatus || "Active";
+      document.getElementById("Country").value                = c.Country || "United Kingdom";
+      document.getElementById("Region").value                 = c.Region || "UK";
+      document.getElementById("RegistrationDate").value       = c.RegistrationDate || "";
+      document.getElementById("RFMSegment").value             = c.RFMSegment || "Potentiels";
+      document.getElementById("CustomerType").value           = c.CustomerType || "Regulier";
+      document.getElementById("WeekendPreference").value      = c.WeekendPreference || "Semaine";
+      document.getElementById("ProductDiversity").value       = c.ProductDiversity || "Modere";
+      hideError();
+      document.getElementById("resultsWrap").classList.remove("visible");
+    })
+    .catch(() => showError("Impossible de charger un client aleatoire."));
 }
 
 function predictChurn() {
-    setPredictLoading(true);
-    hideError();
+  setPredictLoading(true);
+  hideError();
 
-    const data = {
-        CustomerID: num("CustomerID"),
-        Frequency: num("Frequency"),
-        MonetaryTotal: num("MonetaryTotal"),
-        MonetaryAvg: num("MonetaryAvg"),
-        TotalQuantity: num("TotalQuantity"),
-        AvgDaysBetweenPurchases: num("AvgDaysBetweenPurchases"),
-        UniqueProducts: num("UniqueProducts"),
-        TotalTransactions: num("TotalTransactions"),
-        SupportTicketsCount: num("SupportTicketsCount"),
-        SatisfactionScore: num("SatisfactionScore"),
-        Age: num("Age"),
-        Gender: document.getElementById("Gender").value || "F",
-        FavoriteSeason: document.getElementById("FavoriteSeason").value,
-        AccountStatus: document.getElementById("AccountStatus").value,
-        // CORRECTION ERREUR : champs cachés inclus dans le payload
-        // Évite que transform_for_inference reçoive NaN pour ces colonnes importantes
-        Country:           document.getElementById("Country").value           || "United Kingdom",
-        Region:            document.getElementById("Region").value            || "UK",
-        RegistrationDate:  document.getElementById("RegistrationDate").value  || null,
-        RFMSegment:        document.getElementById("RFMSegment").value        || "Potentiels",
-        CustomerType:      document.getElementById("CustomerType").value      || "Regulier",
-        WeekendPreference: document.getElementById("WeekendPreference").value || "Semaine",
-        ProductDiversity:  document.getElementById("ProductDiversity").value  || "Modere"
-    };
+  const data = {
+    CustomerID: num("CustomerID"),
+    Frequency: num("Frequency"),
+    MonetaryTotal: num("MonetaryTotal"),
+    MonetaryAvg: num("MonetaryAvg"),
+    TotalQuantity: num("TotalQuantity"),
+    AvgDaysBetweenPurchases: num("AvgDaysBetweenPurchases"),
+    UniqueProducts: num("UniqueProducts"),
+    TotalTransactions: num("TotalTransactions"),
+    SupportTicketsCount: num("SupportTicketsCount"),
+    SatisfactionScore: num("SatisfactionScore"),
+    Age: num("Age"),
+    Gender: document.getElementById("Gender").value || "F",
+    FavoriteSeason: document.getElementById("FavoriteSeason").value,
+    AccountStatus: document.getElementById("AccountStatus").value,
+    Country: document.getElementById("Country").value || "United Kingdom",
+    Region: document.getElementById("Region").value || "UK",
+    RegistrationDate: document.getElementById("RegistrationDate").value || null,
+    RFMSegment: document.getElementById("RFMSegment").value || "Potentiels",
+    CustomerType: document.getElementById("CustomerType").value || "Regulier",
+    WeekendPreference: document.getElementById("WeekendPreference").value || "Semaine",
+    ProductDiversity: document.getElementById("ProductDiversity").value || "Modere"
+  };
 
-    fetch("/predict", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data)
-    })
-    .then(res => res.json())
-    .then(result => {
-        if (result.success && result.predictions && result.predictions.length > 0) {
-            displayResults(result.predictions[0]);
-        } else {
-            showError("Erreur : " + (result.error || "Réponse invalide"));
-        }
-    })
-    .catch(() => {
-        showError("Impossible de contacter l'API Flask.");
-    })
-    .finally(() => {
-        setPredictLoading(false);
-    });
+  fetch("/predict", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data)
+  })
+  .then(r => r.json())
+  .then(result => {
+    if (result.success && result.predictions && result.predictions.length > 0) {
+      displayResults(result.predictions[0]);
+    } else {
+      showError(result.error || "Reponse invalide");
+    }
+  })
+  .catch(() => showError("Impossible de contacter l'API Flask."))
+  .finally(() => setPredictLoading(false));
+}
+
+function verifyClient() {
+  const id = document.getElementById("CustomerID").value.trim();
+  if (!id || isNaN(id)) { alert("Veuillez entrer un Customer ID valide !"); return; }
+  window.location.href = "/verify/" + id;
 }
 </script>
-
 </body>
 </html>
