@@ -1,6 +1,5 @@
 import os
 import joblib
-import optuna
 import pandas as pd
 import numpy as np
 import matplotlib
@@ -20,14 +19,13 @@ from sklearn.metrics import (
     roc_auc_score,
     mean_absolute_error,
     mean_squared_error,
-    r2_score
+    r2_score,
 )
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-optuna.logging.set_verbosity(optuna.logging.WARNING)
 
-N_PCA_COMPONENTS = 19 
-                    
+N_PCA_COMPONENTS = 19
+
 LEAKAGE_COLS = [
     'Recency',
     'ChurnRiskCategory',
@@ -49,6 +47,7 @@ LEAKAGE_COLS = [
     'UniqueDescriptions',
     'UniqueInvoices',
 ]
+
 REG_FEATURES = [
     'Frequency',
     'TotalQuantity',
@@ -58,11 +57,10 @@ REG_FEATURES = [
     'SupportTicketsCount',
     'SatisfactionScore',
     'Age',
-    'MonetaryAvg',          # ajout
-    'AvgQuantityPerTransaction',  # nom correct
-    'NegativeQuantityCount',# ajout
-    'CancelledTransactions' # ajout
-
+    'MonetaryAvg',
+    'AvgQuantityPerTransaction',
+    'NegativeQuantityCount',
+    'CancelledTransactions',
 ]
 REG_TARGET = 'MonetaryTotal'
 
@@ -97,8 +95,8 @@ def main():
 
     sep("2. Suppression des colonnes data leakage")
 
-    non_num    = X_train.select_dtypes(exclude=[np.number]).columns.tolist()
-    all_drop   = sorted(set(LEAKAGE_COLS + non_num))
+    non_num      = X_train.select_dtypes(exclude=[np.number]).columns.tolist()
+    all_drop     = sorted(set(LEAKAGE_COLS + non_num))
     cols_dropped = [c for c in all_drop if c in X_train.columns]
 
     print(f"  Supprimées ({len(cols_dropped)}) :")
@@ -111,11 +109,11 @@ def main():
 
     print(f"\n  Features restantes : {X_train.shape[1]}")
 
-
     sep("3. Normalisation StandardScaler")
 
+    # FIX : le scaler est fitté UNE SEULE FOIS ici et sauvegardé
+    # predict.py charge ce même scaler — cohérence garantie
     scaler = StandardScaler()
-
     X_train_s = pd.DataFrame(
         scaler.fit_transform(X_train),
         columns=X_train.columns,
@@ -136,8 +134,7 @@ def main():
 
     sep("Analyse VIF — Multicolinéarité")
 
-    vif_df = compute_vif(X_train)
-
+    vif_df   = compute_vif(X_train)
     high_vif = vif_df[vif_df["VIF"] > 10]
 
     if not high_vif.empty:
@@ -152,9 +149,8 @@ def main():
     plot_pca(X_train_s, save_path=pca_path)
     print(f"  Courbe ACP sauvegardée → {pca_path}")
 
-    sep("5. Classification — Recherche Optuna (RandomForest)")
+    sep("5. Classification — Paramètres RandomForest")
 
-    
     best_params = {
         'n_estimators'     : 211,
         'max_depth'        : 16,
@@ -163,14 +159,12 @@ def main():
         'max_features'     : 'sqrt',
         'class_weight'     : 'balanced',
         'random_state'     : 42,
-        'n_jobs'           : -1
+        'n_jobs'           : -1,
     }
 
-    print(f"\n  Parametres fixes : {best_params}")
-    print(f"  (Meilleurs parametres trouves lors de l'optimisation precedente)")
+    print(f"\n  Parametres : {best_params}")
 
     sep("6. Entraînement du modèle final de classification")
-    
 
     best_model = RandomForestClassifier(**best_params)
     best_model.fit(X_train_s, y_train)
@@ -233,17 +227,19 @@ def main():
     var_explained = pca_cluster.explained_variance_ratio_.sum()
     print(f"  Variance expliquée : {var_explained:.1%}")
 
-    norms        = np.linalg.norm(X_train_pca, axis=1)
-    Q1, Q3       = np.percentile(norms, 25), np.percentile(norms, 75)
-    IQR          = Q3 - Q1
-    mask         = norms <= (Q3 + 1.5 * IQR)  # CORRECTION : 3→1.5
-    n_outliers   = (~mask).sum()
+    # Retrait des outliers extrêmes avant clustering
+    norms      = np.linalg.norm(X_train_pca, axis=1)
+    Q1, Q3     = np.percentile(norms, 25), np.percentile(norms, 75)
+    IQR        = Q3 - Q1
+    mask       = norms <= (Q3 + 1.5 * IQR)
+    n_outliers = (~mask).sum()
     print(f"  Outliers extrêmes retirés avant clustering : {n_outliers} clients")
 
     X_train_pca_clean = X_train_pca[mask]
 
-    inertias = []
+    # Courbe du coude (inertie)
     k_range  = range(2, 9)
+    inertias = []
     for k in k_range:
         km = KMeans(n_clusters=k, random_state=42, n_init=10)
         km.fit(X_train_pca_clean)
@@ -260,47 +256,36 @@ def main():
     plt.savefig(elbow_path, dpi=150)
     plt.close()
     print(f"  Courbe du coude sauvegardée → {elbow_path}")
-    kmeans = KMeans(n_clusters=3, random_state=42, n_init=10)
-    kmeans.fit(X_train_pca_clean)   # fit sur données propres
-    clusters = kmeans.predict(X_train_pca)  # predict sur tous les points
+
+    N_CLUSTERS = 3
+    print(f"\n  Clustering avec k={N_CLUSTERS}")
+
+    kmeans   = KMeans(n_clusters=N_CLUSTERS, random_state=42, n_init=10)
+    kmeans.fit(X_train_pca_clean)
+    clusters = kmeans.predict(X_train_pca)
 
     cluster_counts = pd.Series(clusters).value_counts().sort_index()
     print("  Effectif par cluster :")
     for cid, cnt in cluster_counts.items():
         print(f"    Cluster {cid} : {cnt:4d} clients ({cnt / len(clusters):.1%})")
-    X_train_cluster = X_train_s.copy()
-    X_train_cluster['cluster'] = clusters
-    X_train_cluster['Churn']   = y_train.values
+
+    X_train_cluster             = X_train_s.copy()
+    X_train_cluster['cluster']  = clusters
+    X_train_cluster['Churn']    = y_train.values
 
     cluster_summary = X_train_cluster.groupby('cluster').agg(
-        Churn_rate         = ('Churn',                  'mean'),
-        Frequency_mean     = ('Frequency',               'mean'),
-        MonetaryTotal_mean = ('MonetaryTotal',            'mean'),
-        AvgDays_mean       = ('AvgDaysBetweenPurchases',  'mean'),
-        n_clients          = ('Churn',                   'count')
+        Churn_rate         = ('Churn',                   'mean'),
+        Frequency_mean     = ('Frequency',                'mean'),
+        MonetaryTotal_mean = ('MonetaryTotal',             'mean'),
+        AvgDays_mean       = ('AvgDaysBetweenPurchases',   'mean'),
+        n_clients          = ('Churn',                    'count')
     ).round(3)
 
     print("\n  Profil des clusters :")
     print(cluster_summary.to_string())
     cluster_summary.to_csv(os.path.join(reports_dir, "cluster_profiles.csv"))
     print(f"  cluster_profiles.csv → {reports_dir}")
-    pca_2d       = PCA(n_components=2, random_state=42)
-    X_train_2d   = pca_2d.fit_transform(X_train_s)
 
-    plt.figure(figsize=(8, 5))
-    scatter = plt.scatter(
-        X_train_2d[:, 0], X_train_2d[:, 1],
-        c=clusters, cmap="tab10", alpha=0.6, s=15
-    )
-    plt.colorbar(scatter, label="Cluster")
-    plt.xlabel("PC1")
-    plt.ylabel("PC2")
-    plt.title("Clustering KMeans (visualisation PCA 2D)")
-    plt.tight_layout()
-    clust_path = os.path.join(reports_dir, "kmeans_clusters.png")
-    plt.savefig(clust_path, dpi=150)
-    plt.close()
-    print(f"  Clusters sauvegardés → {clust_path}")
     sep("11. Régression — prédiction MonetaryTotal")
 
     df_raw = pd.read_csv(raw_path)
@@ -321,7 +306,7 @@ def main():
         df_reg[col] = pd.to_numeric(df_reg[col], errors='coerce')
         df_reg[col] = df_reg[col].fillna(df_reg[col].median())
 
-    Q1_r, Q3_r = df_reg[REG_TARGET].quantile([0.05, 0.95])    
+    Q1_r, Q3_r = df_reg[REG_TARGET].quantile([0.05, 0.95])
     df_reg = df_reg[(df_reg[REG_TARGET] >= Q1_r) & (df_reg[REG_TARGET] <= Q3_r)]
     print(f"  Outliers MonetaryTotal retirés — {len(df_reg)} lignes conservées")
 
@@ -332,29 +317,28 @@ def main():
         X_reg, y_reg, test_size=0.2, random_state=42
     )
 
-    scaler_reg   = StandardScaler()
-    X_reg_tr_s   = scaler_reg.fit_transform(X_reg_tr)
-    X_reg_te_s   = scaler_reg.transform(X_reg_te)
+    scaler_reg  = StandardScaler()
+    X_reg_tr_s  = scaler_reg.fit_transform(X_reg_tr)
+    X_reg_te_s  = scaler_reg.transform(X_reg_te)
 
     reg_model = RandomForestRegressor(
-        n_estimators=800,      # plus d'arbres
-        max_depth=25,          # arbres plus profonds
-        min_samples_split=3,   # splits plus fins
-        min_samples_leaf=1,    # feuilles plus petites
-        max_features='sqrt',   # meilleures features par split
+        n_estimators=800,
+        max_depth=25,
+        min_samples_split=3,
+        min_samples_leaf=1,
+        max_features='sqrt',
         random_state=42,
         n_jobs=-1
-    )   
+    )
     reg_model.fit(X_reg_tr_s, y_reg_tr)
 
-    y_reg_pred = reg_model.predict(X_reg_te_s)
-    mae  = mean_absolute_error(y_reg_te, y_reg_pred)
-    rmse = np.sqrt(mean_squared_error(y_reg_te, y_reg_pred))
-    r2   = r2_score(y_reg_te, y_reg_pred)
-
-    mean_monetary = y_reg_te.mean()
-    mae_pct  = (mae  / mean_monetary) * 100
-    rmse_pct = (rmse / mean_monetary) * 100
+    y_reg_pred   = reg_model.predict(X_reg_te_s)
+    mae          = mean_absolute_error(y_reg_te, y_reg_pred)
+    rmse         = np.sqrt(mean_squared_error(y_reg_te, y_reg_pred))
+    r2           = r2_score(y_reg_te, y_reg_pred)
+    mean_monetary= y_reg_te.mean()
+    mae_pct      = (mae  / mean_monetary) * 100
+    rmse_pct     = (rmse / mean_monetary) * 100
 
     print(f"  MAE  : {mae:.2f} £  ({mae_pct:.1f}% de la dépense moyenne)")
     print(f"  RMSE : {rmse:.2f} £  ({rmse_pct:.1f}% de la dépense moyenne)")
@@ -380,12 +364,11 @@ def main():
 
     print(f"  scaler.pkl               → {scaler_path} (déjà sauvegardé)")
 
-
     sep("RÉSUMÉ FINAL")
     print(f"  Classification Accuracy : {acc:.4f}")
     print(f"  Classification AUC-ROC  : {auc:.4f}")
     print(f"  Classification F1 CV-5  : {cv_scores.mean():.4f} ± {cv_scores.std():.4f}")
-    print(f"  Clustering              : 3 segments identifiés")
+    print(f"  Clustering              : {N_CLUSTERS} segments identifiés")
     print(f"  Régression MAE          : {mae:.2f} £  ({mae_pct:.1f}%)")
     print(f"  Régression RMSE         : {rmse:.2f} £  ({rmse_pct:.1f}%)")
     print(f"  Régression R²           : {r2:.4f}")

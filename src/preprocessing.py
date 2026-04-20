@@ -3,6 +3,7 @@ import joblib
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
+from sklearn.impute import KNNImputer
 
 
 LEAKAGE_COLS = [
@@ -17,9 +18,10 @@ LEAKAGE_COLS = [
     'PreferredMonth',
     'CustomerTenureDays',
     'FirstPurchaseDaysAgo',
-    'UniqueDescriptions',  
-    'UniqueInvoices',     
+    'UniqueDescriptions',
+    'UniqueInvoices',
 ]
+
 
 def load_data(path: str) -> pd.DataFrame:
     df = pd.read_csv(path)
@@ -65,6 +67,7 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
     print(f"[clean] Terminé → {df.shape[1]} colonnes | NaN : {df.isnull().sum().sum()}")
     return df
 
+
 def feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
 
@@ -84,7 +87,6 @@ def fit_country_encoder(X_train: pd.DataFrame, y_train: pd.Series) -> dict:
     temp = X_train[['Country']].copy()
     temp['Churn'] = y_train.values
     return temp.groupby('Country')['Churn'].mean().to_dict()
-
 
 
 def encode_data(df: pd.DataFrame, country_means: dict | None = None) -> pd.DataFrame:
@@ -125,7 +127,8 @@ def transform_for_inference(
     df_raw: pd.DataFrame,
     country_means: dict,
     impute_values: dict,
-    feature_names: list
+    feature_names: list,
+    knn_age=None          # FIX : reçu en paramètre, plus de joblib.load() à chaque appel
 ) -> pd.DataFrame:
 
     df = df_raw.copy()
@@ -160,13 +163,10 @@ def transform_for_inference(
         if col in df.columns:
             df[col] = df[col].fillna(val)
 
-# KNN pour Age à l'inférence
-    BASE_DIR_INF = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    knn_age_path = os.path.join(BASE_DIR_INF, "models", "knn_age.pkl")
-    if os.path.exists(knn_age_path) and 'Age' in df.columns:
-        knn_age = joblib.load(knn_age_path)
+    # FIX : knn_age passé en paramètre — plus de rechargement disque à chaque inférence
+    if knn_age is not None and 'Age' in df.columns:
         df['Age'] = knn_age.transform(df[['Age']]).ravel()
-    
+
     df = encode_data(df, country_means=country_means)
     df = df.drop(columns=[c for c in LEAKAGE_COLS if c in df.columns], errors='ignore')
     df = df.reindex(columns=feature_names, fill_value=0)
@@ -176,19 +176,19 @@ def transform_for_inference(
 
 if __name__ == "__main__":
 
-    BASE_DIR   = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    raw_path   = os.path.join(BASE_DIR, "data", "raw", "data.csv")
-    tt_dir     = os.path.join(BASE_DIR, "data", "train_test")
-    proc_dir   = os.path.join(BASE_DIR, "data", "processed")
-    models_dir = os.path.join(BASE_DIR, "models")
+    BASE_DIR    = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    raw_path    = os.path.join(BASE_DIR, "data", "raw", "data.csv")
+    tt_dir      = os.path.join(BASE_DIR, "data", "train_test")
+    proc_dir    = os.path.join(BASE_DIR, "data", "processed")
+    models_dir  = os.path.join(BASE_DIR, "models")
     reports_dir = os.path.join(BASE_DIR, "reports")
 
     os.makedirs(tt_dir,      exist_ok=True)
     os.makedirs(proc_dir,    exist_ok=True)
     os.makedirs(models_dir,  exist_ok=True)
     os.makedirs(reports_dir, exist_ok=True)
-    df = load_data(raw_path)
 
+    df = load_data(raw_path)
     df = clean_data(df)
 
     y = df['Churn']
@@ -217,38 +217,36 @@ if __name__ == "__main__":
 
     print(f"[impute] {len(impute_values)} colonnes imputées (médiane train)")
 
-# KNN Imputer pour Age
-    from sklearn.impute import KNNImputer
+    # FIX : indentation corrigée — tout le bloc KNN est bien dans le if
     if 'Age' in X_train_raw.columns:
         knn = KNNImputer(n_neighbors=5)
-    X_train_raw['Age'] = knn.fit_transform(
-        X_train_raw[['Age']]
-    ).ravel()
-    X_test_raw['Age'] = knn.transform(
-        X_test_raw[['Age']]
-    ).ravel()
-    print("[impute] Age → KNN Imputer (k=5) ✅")
+        X_train_raw['Age'] = knn.fit_transform(X_train_raw[['Age']]).ravel()
+        X_test_raw['Age']  = knn.transform(X_test_raw[['Age']]).ravel()
+        print("[impute] Age → KNN Imputer (k=5) ✅")
+    else:
+        knn = None
+        print("[impute] Colonne Age absente — KNN ignoré")
+
     country_means = fit_country_encoder(X_train_raw, y_train)
 
     X_train_enc = encode_data(X_train_raw, country_means=country_means)
     X_test_enc  = encode_data(X_test_raw,  country_means=country_means)
     X_test_enc  = X_test_enc.reindex(columns=X_train_enc.columns, fill_value=0)
 
-
     from utils import compute_vif
 
     print("\nCalcul du VIF (multicolinéarité)...")
     vif_df = compute_vif(X_train_enc)
-
     vif_df.to_csv(os.path.join(reports_dir, "vif_report.csv"), index=False)
     print(f"[save]  vif_report.csv → {reports_dir}")
-    high_vif = vif_df[vif_df["VIF"] > 10]
 
+    high_vif = vif_df[vif_df["VIF"] > 10]
     if not high_vif.empty:
         print("\n⚠ Features à forte multicolinéarité :")
         print(high_vif.head(10))
     else:
         print("\n✅ Pas de multicolinéarité critique (VIF < 10)")
+
     X_train_enc.to_csv(os.path.join(tt_dir, "X_train.csv"), index=False)
     X_test_enc.to_csv( os.path.join(tt_dir, "X_test.csv"),  index=False)
     y_train.to_csv(    os.path.join(tt_dir, "y_train.csv"),  index=False)
@@ -268,8 +266,10 @@ if __name__ == "__main__":
 
     joblib.dump(country_means, os.path.join(models_dir, "country_means.pkl"))
     joblib.dump(impute_values, os.path.join(models_dir, "impute_values.pkl"))
-    joblib.dump(knn, os.path.join(models_dir, "knn_age.pkl"))
+    if knn is not None:
+        joblib.dump(knn, os.path.join(models_dir, "knn_age.pkl"))
     print(f"[save]  country_means + impute_values + knn_age → {models_dir}")
+
     print(f"\n{'='*55}")
     print(f"  X_train : {X_train_enc.shape}  (non scalé)")
     print(f"  X_test  : {X_test_enc.shape}   (non scalé)")

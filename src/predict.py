@@ -22,6 +22,7 @@ REG_MODEL_PATH    = os.path.join(MODELS_DIR, "reg_model.pkl")
 SCALER_REG_PATH   = os.path.join(MODELS_DIR, "scaler_reg.pkl")
 REG_FEATURES_PATH = os.path.join(MODELS_DIR, "reg_features.pkl")
 KNN_AGE_PATH      = os.path.join(MODELS_DIR, "knn_age.pkl")
+
 _model         = None
 _scaler        = None
 _feature_names = None
@@ -35,11 +36,11 @@ _reg_features  = None
 _knn_age       = None
 
 
-
 def load_artifacts():
     global _model, _scaler, _feature_names, _country_means, _impute_values
     global _kmeans, _pca_cluster, _reg_model, _scaler_reg, _reg_features
-    global _knn_age 
+    global _knn_age
+
     if _model is not None:
         return
 
@@ -77,7 +78,8 @@ def load_artifacts():
     _scaler_reg    = joblib.load(SCALER_REG_PATH)
     _reg_features  = joblib.load(REG_FEATURES_PATH)
     _knn_age       = joblib.load(KNN_AGE_PATH)
-    print(f"[load] Artefacts charges — "
+
+    print(f"[load] Artefacts chargés — "
           f"{len(_feature_names)} features clf | {len(_reg_features)} features reg")
 
 
@@ -97,11 +99,12 @@ def cluster_label(c: int) -> str:
 
 
 def predict(df_raw: pd.DataFrame) -> pd.DataFrame:
-    
+
     load_artifacts()
 
+    # FIX : _knn_age passé en paramètre — plus de rechargement disque à chaque appel
     X_clf = transform_for_inference(
-        df_raw, _country_means, _impute_values, _feature_names
+        df_raw, _country_means, _impute_values, _feature_names, knn_age=_knn_age
     )
 
     X_clf_scaled = pd.DataFrame(
@@ -113,12 +116,11 @@ def predict(df_raw: pd.DataFrame) -> pd.DataFrame:
     preds  = _model.predict(X_clf_scaled)
     probas = _model.predict_proba(X_clf_scaled)[:, 1]
 
-   
-    X_clf_aligned = X_clf_scaled.reindex(columns=_feature_names, fill_value=0)
-    X_pca    = _pca_cluster.transform(X_clf_aligned)
+    # FIX : X_clf_scaled a déjà les bonnes colonnes — reindex redondant supprimé
+    X_pca    = _pca_cluster.transform(X_clf_scaled)
     clusters = _kmeans.predict(X_pca)
 
-
+    # Régression
     df_reg = df_raw.copy()
 
     if "SupportTicketsCount" in df_reg.columns:
@@ -137,7 +139,7 @@ def predict(df_raw: pd.DataFrame) -> pd.DataFrame:
     X_reg_scaled  = _scaler_reg.transform(X_reg)
     monetary_pred = np.maximum(0, _reg_model.predict(X_reg_scaled))
 
-
+    # Construction des résultats
     if "CustomerID" in df_raw.columns:
         results = df_raw[["CustomerID"]].copy().reset_index(drop=True)
     else:
@@ -157,7 +159,7 @@ if __name__ == "__main__":
     raw_path = os.path.join(BASE_DIR, "data", "raw", "data.csv")
 
     print("=" * 60)
-    print("  PREDICT — Test sur 10 clients aleatoires")
+    print("  PREDICT — Test sur 10 clients aléatoires")
     print("=" * 60)
 
     if not os.path.exists(raw_path):
@@ -169,11 +171,11 @@ if __name__ == "__main__":
 
     results = predict(sample)
 
-    print("\nResultats :")
+    print("\nRésultats :")
     print(results.to_string(index=False))
 
-    print(f"\n  Churners predits    : {results['churn_pred'].sum()} / {len(results)}")
-    print(f"  Probabilite moyenne : {results['churn_proba'].mean():.2%}")
+    print(f"\n  Churners prédits    : {results['churn_pred'].sum()} / {len(results)}")
+    print(f"  Probabilité moyenne : {results['churn_proba'].mean():.2%}")
     print(f"  Niveaux de risque   : {results['risk_level'].value_counts().to_dict()}")
     print(f"  Clusters            : {results['cluster_label'].value_counts().to_dict()}")
-    print(f"  Depense prevue moy. : £{results['monetary_pred'].mean():.2f}")
+    print(f"  Dépense prévue moy. : £{results['monetary_pred'].mean():.2f}")
