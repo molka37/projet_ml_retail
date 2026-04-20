@@ -36,14 +36,13 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
         df['IP_IsPrivate'] = df['LastLoginIP'].str.match(
             r'^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.)'
         ).astype(int)
-        print(f"[clean] LastLoginIP → IP_IsPrivate extrait")
+        print("[clean] LastLoginIP → IP_IsPrivate extrait")
 
-    df = df.drop(columns=[c for c in
-                           ['NewsletterSubscribed', 'LastLoginIP', 'CustomerID']
-                           if c in df.columns])
+    df = df.drop(columns=[c for c in ['NewsletterSubscribed', 'LastLoginIP', 'CustomerID'] if c in df.columns])
 
     if 'SatisfactionScore' in df.columns:
         df['SatisfactionScore'] = df['SatisfactionScore'].replace([-1, 99], np.nan)
+
     if 'SupportTicketsCount' in df.columns:
         df['SupportTicketsCount'] = df['SupportTicketsCount'].replace([-1, 999], np.nan)
 
@@ -58,9 +57,9 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
             dayfirst=True,
             errors='coerce'
         )
-        df['RegYear']    = df['RegistrationDate'].dt.year
-        df['RegMonth']   = df['RegistrationDate'].dt.month
-        df['RegDay']     = df['RegistrationDate'].dt.day
+        df['RegYear'] = df['RegistrationDate'].dt.year
+        df['RegMonth'] = df['RegistrationDate'].dt.month
+        df['RegDay'] = df['RegistrationDate'].dt.day
         df['RegWeekday'] = df['RegistrationDate'].dt.weekday
         df = df.drop(columns=['RegistrationDate'])
 
@@ -84,6 +83,7 @@ def feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
 def fit_country_encoder(X_train: pd.DataFrame, y_train: pd.Series) -> dict:
     if 'Country' not in X_train.columns:
         return {}
+
     temp = X_train[['Country']].copy()
     temp['Churn'] = y_train.values
     return temp.groupby('Country')['Churn'].mean().to_dict()
@@ -93,12 +93,12 @@ def encode_data(df: pd.DataFrame, country_means: dict | None = None) -> pd.DataF
     df = df.copy()
 
     ordinal_mappings = {
-        'AgeCategory'       : ['18-24','25-34','35-44','45-54','55-64','65+','Inconnu'],
-        'SpendingCategory'  : ['Low','Medium','High','VIP'],
-        'LoyaltyLevel'      : ['Nouveau','Jeune','Établi','Ancien','Inconnu'],
-        'ChurnRiskCategory' : ['Faible','Moyen','Élevé','Critique'],
-        'BasketSizeCategory': ['Petit','Moyen','Grand','Inconnu'],
-        'PreferredTimeOfDay': ['Matin','Midi','Après-midi','Soir','Nuit'],
+        'AgeCategory': ['18-24', '25-34', '35-44', '45-54', '55-64', '65+', 'Inconnu'],
+        'SpendingCategory': ['Low', 'Medium', 'High', 'VIP'],
+        'LoyaltyLevel': ['Nouveau', 'Jeune', 'Établi', 'Ancien', 'Inconnu'],
+        'ChurnRiskCategory': ['Faible', 'Moyen', 'Élevé', 'Critique'],
+        'BasketSizeCategory': ['Petit', 'Moyen', 'Grand', 'Inconnu'],
+        'PreferredTimeOfDay': ['Matin', 'Midi', 'Après-midi', 'Soir', 'Nuit'],
     }
 
     for col, order in ordinal_mappings.items():
@@ -128,9 +128,8 @@ def transform_for_inference(
     country_means: dict,
     impute_values: dict,
     feature_names: list,
-    knn_age=None          # FIX : reçu en paramètre, plus de joblib.load() à chaque appel
+    knn_age=None
 ) -> pd.DataFrame:
-
     df = df_raw.copy()
 
     if 'LastLoginIP' in df.columns:
@@ -138,22 +137,24 @@ def transform_for_inference(
             r'^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.)'
         ).astype(int)
 
-    df = df.drop(columns=[c for c in
-                           ['NewsletterSubscribed', 'LastLoginIP', 'CustomerID', 'Churn']
-                           if c in df.columns])
+    df = df.drop(columns=[c for c in ['NewsletterSubscribed', 'LastLoginIP', 'CustomerID', 'Churn'] if c in df.columns])
 
     if 'SatisfactionScore' in df.columns:
         df['SatisfactionScore'] = df['SatisfactionScore'].replace([-1, 99], np.nan)
+
     if 'SupportTicketsCount' in df.columns:
         df['SupportTicketsCount'] = df['SupportTicketsCount'].replace([-1, 999], np.nan)
 
     if 'RegistrationDate' in df.columns:
         df['RegistrationDate'] = pd.to_datetime(
-            df['RegistrationDate'], format='mixed', dayfirst=True, errors='coerce'
+            df['RegistrationDate'],
+            format='mixed',
+            dayfirst=True,
+            errors='coerce'
         )
-        df['RegYear']    = df['RegistrationDate'].dt.year.fillna(2010).astype(int)
-        df['RegMonth']   = df['RegistrationDate'].dt.month.fillna(1).astype(int)
-        df['RegDay']     = df['RegistrationDate'].dt.day.fillna(1).astype(int)
+        df['RegYear'] = df['RegistrationDate'].dt.year.fillna(2010).astype(int)
+        df['RegMonth'] = df['RegistrationDate'].dt.month.fillna(1).astype(int)
+        df['RegDay'] = df['RegistrationDate'].dt.day.fillna(1).astype(int)
         df['RegWeekday'] = df['RegistrationDate'].dt.weekday.fillna(0).astype(int)
         df = df.drop(columns=['RegistrationDate'])
 
@@ -163,7 +164,6 @@ def transform_for_inference(
         if col in df.columns:
             df[col] = df[col].fillna(val)
 
-    # FIX : knn_age passé en paramètre — plus de rechargement disque à chaque inférence
     if knn_age is not None and 'Age' in df.columns:
         df['Age'] = knn_age.transform(df[['Age']]).ravel()
 
@@ -175,17 +175,16 @@ def transform_for_inference(
 
 
 if __name__ == "__main__":
-
-    BASE_DIR    = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    raw_path    = os.path.join(BASE_DIR, "data", "raw", "data.csv")
-    tt_dir      = os.path.join(BASE_DIR, "data", "train_test")
-    proc_dir    = os.path.join(BASE_DIR, "data", "processed")
-    models_dir  = os.path.join(BASE_DIR, "models")
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    raw_path = os.path.join(BASE_DIR, "data", "raw", "data.csv")
+    tt_dir = os.path.join(BASE_DIR, "data", "train_test")
+    proc_dir = os.path.join(BASE_DIR, "data", "processed")
+    models_dir = os.path.join(BASE_DIR, "models")
     reports_dir = os.path.join(BASE_DIR, "reports")
 
-    os.makedirs(tt_dir,      exist_ok=True)
-    os.makedirs(proc_dir,    exist_ok=True)
-    os.makedirs(models_dir,  exist_ok=True)
+    os.makedirs(tt_dir, exist_ok=True)
+    os.makedirs(proc_dir, exist_ok=True)
+    os.makedirs(models_dir, exist_ok=True)
     os.makedirs(reports_dir, exist_ok=True)
 
     df = load_data(raw_path)
@@ -199,7 +198,7 @@ if __name__ == "__main__":
     )
 
     X_train_raw = feature_engineering(X_train_raw)
-    X_test_raw  = feature_engineering(X_test_raw)
+    X_test_raw = feature_engineering(X_test_raw)
 
     numeric_cols = X_train_raw.select_dtypes(include=[np.number]).columns
 
@@ -213,15 +212,14 @@ if __name__ == "__main__":
         if col in X_train_raw.columns:
             X_train_raw[col] = X_train_raw[col].fillna(val)
         if col in X_test_raw.columns:
-            X_test_raw[col]  = X_test_raw[col].fillna(val)
+            X_test_raw[col] = X_test_raw[col].fillna(val)
 
     print(f"[impute] {len(impute_values)} colonnes imputées (médiane train)")
 
-    # FIX : indentation corrigée — tout le bloc KNN est bien dans le if
     if 'Age' in X_train_raw.columns:
         knn = KNNImputer(n_neighbors=5)
         X_train_raw['Age'] = knn.fit_transform(X_train_raw[['Age']]).ravel()
-        X_test_raw['Age']  = knn.transform(X_test_raw[['Age']]).ravel()
+        X_test_raw['Age'] = knn.transform(X_test_raw[['Age']]).ravel()
         print("[impute] Age → KNN Imputer (k=5) ✅")
     else:
         knn = None
@@ -230,15 +228,16 @@ if __name__ == "__main__":
     country_means = fit_country_encoder(X_train_raw, y_train)
 
     X_train_enc = encode_data(X_train_raw, country_means=country_means)
-    X_test_enc  = encode_data(X_test_raw,  country_means=country_means)
-    X_test_enc  = X_test_enc.reindex(columns=X_train_enc.columns, fill_value=0)
+    X_test_enc = encode_data(X_test_raw, country_means=country_means)
+    X_test_enc = X_test_enc.reindex(columns=X_train_enc.columns, fill_value=0)
 
-    from utils import compute_vif
+    from utils import compute_vif, missing_report, print_df_info
 
     print("\nCalcul du VIF (multicolinéarité)...")
     vif_df = compute_vif(X_train_enc)
-    vif_df.to_csv(os.path.join(reports_dir, "vif_report.csv"), index=False)
-    print(f"[save]  vif_report.csv → {reports_dir}")
+    vif_path = os.path.join(reports_dir, "vif_report.csv")
+    vif_df.to_csv(vif_path, index=False)
+    print(f"[save]  vif_report.csv → {vif_path}")
 
     high_vif = vif_df[vif_df["VIF"] > 10]
     if not high_vif.empty:
@@ -248,16 +247,15 @@ if __name__ == "__main__":
         print("\n✅ Pas de multicolinéarité critique (VIF < 10)")
 
     X_train_enc.to_csv(os.path.join(tt_dir, "X_train.csv"), index=False)
-    X_test_enc.to_csv( os.path.join(tt_dir, "X_test.csv"),  index=False)
-    y_train.to_csv(    os.path.join(tt_dir, "y_train.csv"),  index=False)
-    y_test.to_csv(     os.path.join(tt_dir, "y_test.csv"),   index=False)
+    X_test_enc.to_csv(os.path.join(tt_dir, "X_test.csv"), index=False)
+    y_train.to_csv(os.path.join(tt_dir, "y_train.csv"), index=False)
+    y_test.to_csv(os.path.join(tt_dir, "y_test.csv"), index=False)
     print(f"[save]  Splits sauvegardés → {tt_dir}")
 
     cleaned = X_train_enc.copy()
     cleaned['Churn'] = y_train.values
     cleaned.to_csv(os.path.join(proc_dir, "cleaned_data.csv"), index=False)
 
-    from utils import missing_report, print_df_info
     print_df_info(df, label="Dataset après nettoyage")
     report = missing_report(df)
     if not report.empty:
@@ -268,6 +266,7 @@ if __name__ == "__main__":
     joblib.dump(impute_values, os.path.join(models_dir, "impute_values.pkl"))
     if knn is not None:
         joblib.dump(knn, os.path.join(models_dir, "knn_age.pkl"))
+
     print(f"[save]  country_means + impute_values + knn_age → {models_dir}")
 
     print(f"\n{'='*55}")
